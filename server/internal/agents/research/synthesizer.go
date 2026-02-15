@@ -44,6 +44,6 @@ func (s *GeminiSynthesizer) buildPrompt(query string, results []models.RankedRes
 		o := r.OrganicResult
 		sb.WriteString(fmt.Sprintf("%d. [%s] %s\n   %s\n   %s\n\n", i+1, o.Link, o.Title, o.Snippet, o.Link))
 	}
-	sb.WriteString("\n\nOUTPUT: Your final answer must be written entirely in personality mode — use the voice, tone, and style defined in your identity. Provide a comprehensive, well-structured, analytical answer using ONLY the sources above. Never write [1], [2], or any numbers in square brackets in your answer. No citations or source references in the text — write clean markdown only (paragraphs, lists, bold, etc.). Do not add meta-commentary; output only the personality-styled answer.")
+	sb.WriteString("\n\nOUTPUT: Your final answer must be written entirely in personality mode — use the voice, tone, and style defined in your identity. Provide a comprehensive, well-structured, analytical answer using ONLY the sources above. Do not include source numbers or citations in the text; write clean markdown (paragraphs, lists, bold, etc.) only. Do not add meta-commentary; output only the personality-styled answer.")
 	return sb.String()
 }

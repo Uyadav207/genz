@@ -12,36 +12,16 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/genz/server/internal/agents"
 	"github.com/genz/server/config"
 	"github.com/genz/server/database"
+	"github.com/genz/server/internal/agents"
 	"github.com/genz/server/models"
 	"github.com/genz/server/services"
 	"github.com/gin-gonic/gin"
 )
-
-// researchSSEEvent is sent over the channel for research progress streaming.
-type researchSSEEvent struct {
-	Event string      `json:"-"`
-	Data  interface{} `json:"-"`
-}
-
-// progressChanReporter sends progress to a channel for SSE.
-type progressChanReporter struct{ ch chan<- researchSSEEvent }
-
-func (p *progressChanReporter) Report(step string, detail map[string]interface{}) {
-	data := map[string]interface{}{"step": step}
-	for k, v := range detail {
-		data[k] = v
-	}
-	select {
-	case p.ch <- researchSSEEvent{Event: "progress", Data: data}:
-	default:
-		// channel full or closed, skip
-	}
-}
 
 const geminiModel = "gemini-2.0-flash"
 const geminiBaseURL = "https://generativelanguage.googleapis.com/v1beta/models"
@@ -57,18 +37,39 @@ type ChatMessage struct {
 
 // ChatRequest is the request body for the chat completion endpoint.
 type ChatRequest struct {
-	ChatID        *string       `json:"chat_id"`        // optional; if empty, a new chat is created
-	Messages      []ChatMessage `json:"messages"`        //
-	AgentID       *string       `json:"agent_id"`       // optional; if empty, default (genz) is used; determines personality
-	Tools         []string      `json:"tools"`          // optional; e.g. ["web_search"] triggers web search, ["research"] triggers research
-	PDFContext    string        `json:"pdf_context"`    // optional; extracted text from attached PDF for LLM context
-	AttachmentIDs []string      `json:"attachment_ids"` // optional; IDs to link to this chat after creation
+	ChatID         *string       `json:"chat_id"`         // optional; if empty, a new chat is created
+	Messages       []ChatMessage `json:"messages"`        //
+	AgentID        *string       `json:"agent_id"`        // optional; if empty, default (genz) is used; determines personality
+	Tools          []string      `json:"tools"`           // optional; e.g. ["web_search"] triggers web search, ["research"] triggers research
+	StreamProgress bool          `json:"stream_progress"` // optional; when true and tools include research, response is SSE with progress events then result
+	PDFContext     string        `json:"pdf_context"`     // optional; extracted text from attached PDF for LLM context
+	AttachmentIDs  []string      `json:"attachment_ids"`  // optional; IDs to link to this chat after creation
 }
 
 // ChatResponse is the response from the chat completion endpoint.
 type ChatResponse struct {
 	ChatID  string `json:"chat_id"`
 	Content string `json:"content"`
+}
+
+// sseProgressReporter writes progress events as SSE to w (implements research.ProgressReporter).
+type sseProgressReporter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (r *sseProgressReporter) Report(step string, detail map[string]interface{}) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	payload := map[string]interface{}{"step": step}
+	if len(detail) > 0 {
+		payload["detail"] = detail
+	}
+	body, _ := json.Marshal(payload)
+	fmt.Fprintf(r.w, "event: progress\ndata: %s\n\n", body)
+	if flusher, ok := r.w.(http.Flusher); ok {
+		flusher.Flush()
+	}
 }
 
 // Gemini API request/response structures.
@@ -247,7 +248,7 @@ func ChatComplete(cfg *config.Config) gin.HandlerFunc {
 		}
 		// Route Research (agent_id: brain/research or tools: research)
 		if hasResearch {
-			log.Printf("[CHAT] Routing to RESEARCH, query=%q personality=%q", lastMsg.Content, personalityID)
+			log.Printf("[CHAT] Routing to RESEARCH, query=%q personality=%q stream_progress=%v", lastMsg.Content, personalityID, req.StreamProgress)
 			if cfg.SERPAPIKey == "" {
 				c.JSON(http.StatusServiceUnavailable, gin.H{
 					"error":   "research_unavailable",
@@ -255,56 +256,45 @@ func ChatComplete(cfg *config.Config) gin.HandlerFunc {
 				})
 				return
 			}
-			streamProgress := c.Query("stream_progress") == "true"
-			if streamProgress {
-				// SSE: stream progress events then result
+			researchCtx, cancel := context.WithTimeout(c.Request.Context(), 55*time.Second)
+			defer cancel()
+
+			if req.StreamProgress {
 				c.Header("Content-Type", "text/event-stream")
 				c.Header("Cache-Control", "no-cache")
 				c.Header("Connection", "keep-alive")
 				c.Header("X-Accel-Buffering", "no")
-				ch := make(chan researchSSEEvent, 32)
-				reporter := &progressChanReporter{ch: ch}
-				researchCtx, cancel := context.WithTimeout(c.Request.Context(), 55*time.Second)
-				go func() {
-					defer cancel()
-					defer close(ch)
-					result, err := researchSvc.RunWithProgress(researchCtx, lastMsg.Content, personalityID, reporter)
-					if err != nil {
-						ch <- researchSSEEvent{Event: "error", Data: gin.H{"error": "research_error", "message": err.Error()}}
-						return
-					}
-					extra := make(map[string]interface{})
-					if len(result.Sources) > 0 {
-						extra["sources"] = result.Sources
-					}
-					if result.ResearchMeta != nil {
-						extra["research_meta"] = result.ResearchMeta
-					}
-					_ = saveAssistantMessageWithExtra(chatID, result.Answer, extra)
-					resp := gin.H{"chat_id": chatID, "content": result.Answer}
-					if len(result.Sources) > 0 {
-						resp["sources"] = result.Sources
-					}
-					if result.ResearchMeta != nil {
-						resp["research_meta"] = result.ResearchMeta
-					}
-					ch <- researchSSEEvent{Event: "result", Data: resp}
-				}()
-				c.Stream(func(w io.Writer) bool {
-					ev, ok := <-ch
-					if !ok {
-						return false
-					}
-					dataBytes, _ := json.Marshal(ev.Data)
-					fmt.Fprintf(w, "event: %s\ndata: %s\n\n", ev.Event, dataBytes)
-					c.Writer.Flush()
-					return ev.Event != "result" && ev.Event != "error"
-				})
+				reporter := &sseProgressReporter{w: c.Writer}
+				result, err := researchSvc.RunWithProgress(researchCtx, lastMsg.Content, personalityID, reporter)
+				if err != nil {
+					errPayload, _ := json.Marshal(gin.H{"error": "research_error", "message": err.Error()})
+					fmt.Fprintf(c.Writer, "event: error\ndata: %s\n\n", errPayload)
+					return
+				}
+				extra := make(map[string]interface{})
+				if len(result.Sources) > 0 {
+					extra["sources"] = result.Sources
+				}
+				if result.ResearchMeta != nil {
+					extra["research_meta"] = result.ResearchMeta
+				}
+				_ = saveAssistantMessageWithExtra(chatID, result.Answer, extra)
+				resp := gin.H{"chat_id": chatID, "content": result.Answer}
+				if len(result.Sources) > 0 {
+					resp["sources"] = result.Sources
+				}
+				if result.ResearchMeta != nil {
+					resp["research_meta"] = result.ResearchMeta
+				}
+				resultJSON, _ := json.Marshal(resp)
+				fmt.Fprintf(c.Writer, "event: result\ndata: %s\n\n", resultJSON)
+				if flusher, ok := c.Writer.(http.Flusher); ok {
+					flusher.Flush()
+				}
+				log.Printf("[CHAT] Research SSE done: answer_len=%d sources=%d", len(result.Answer), len(result.Sources))
 				return
 			}
-			// Non-streaming research
-			researchCtx, cancel := context.WithTimeout(c.Request.Context(), 55*time.Second)
-			defer cancel()
+
 			result, err := researchSvc.Run(researchCtx, lastMsg.Content, personalityID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
@@ -677,4 +667,32 @@ func GetChatMessages(c *gin.Context) {
 	}
 	sort.Slice(messages, func(i, j int) bool { return messages[i].CreatedAt.Before(messages[j].CreatedAt) })
 	c.JSON(http.StatusOK, gin.H{"messages": messages})
+}
+
+// DeleteChat deletes a chat and its messages (user must own the chat).
+// DELETE /api/v1/chats/:id
+func DeleteChat(c *gin.Context) {
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": err.Error()})
+		return
+	}
+	chatID := c.Param("id")
+	if chatID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "chat_id_required"})
+		return
+	}
+	var chats []models.Chat
+	err = database.GetAdminClient().DB.From("chats").Select("id").Eq("id", chatID).Eq("user_id", userID).Execute(&chats)
+	if err != nil || len(chats) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "chat not found"})
+		return
+	}
+	// CASCADE will delete messages when chat is deleted
+	err = database.GetAdminClient().DB.From("chats").Delete().Eq("id", chatID).Eq("user_id", userID).Execute(&[]models.Chat{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database_error", "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Chat deleted"})
 }

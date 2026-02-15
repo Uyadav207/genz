@@ -48,6 +48,7 @@ func Setup(router *gin.Engine, cfg *config.Config) {
 		// Chats (list and load conversation)
 		protected.GET("/chats", handlers.ListChats)
 		protected.GET("/chats/:id/messages", handlers.GetChatMessages)
+		protected.DELETE("/chats/:id", handlers.DeleteChat)
 
 		// Profile
 		protected.GET("/profile", handlers.GetProfile)

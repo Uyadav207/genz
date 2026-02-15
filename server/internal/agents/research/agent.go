@@ -51,21 +51,7 @@ func NewAgent(planner Planner, webSearch skills.Skill, ranker Ranker, synthesize
 // Run executes the full research pipeline and returns the answer with sources.
 // If ctx is cancelled (e.g. timeout), returns a partial result when possible (ResearchMeta.Partial set).
 func (a *Agent) Run(ctx context.Context, query string, personalityPrompt string) (*models.ResearchResponse, error) {
-	return a.runWithReporter(ctx, query, personalityPrompt, a.progress)
-}
-
-// RunWithProgressReporter runs the pipeline using the given reporter for progress (e.g. for SSE streaming).
-// If reporter is nil, uses the agent's default progress.
-func (a *Agent) RunWithProgressReporter(ctx context.Context, query string, personalityPrompt string, reporter ProgressReporter) (*models.ResearchResponse, error) {
-	p := reporter
-	if p == nil {
-		p = a.progress
-	}
-	return a.runWithReporter(ctx, query, personalityPrompt, p)
-}
-
-func (a *Agent) runWithReporter(ctx context.Context, query string, personalityPrompt string, progress ProgressReporter) (*models.ResearchResponse, error) {
-	progress.Report("planning", nil)
+	a.progress.Report("planning", nil)
 	plan, err := a.planner.Plan(ctx, query)
 	if err != nil {
 		return nil, err
@@ -79,7 +65,7 @@ func (a *Agent) runWithReporter(ctx context.Context, query string, personalityPr
 	total := len(plan.SubQueries)
 
 	for i, sq := range plan.SubQueries {
-		progress.Report("searching", map[string]interface{}{
+		a.progress.Report("searching", map[string]interface{}{
 			"current": i + 1,
 			"total":   total,
 			"query":   sq,
@@ -114,7 +100,7 @@ func (a *Agent) runWithReporter(ctx context.Context, query string, personalityPr
 		return a.emptyResponse(plan.SubQueries, false)
 	}
 
-	progress.Report("ranking", nil)
+	a.progress.Report("ranking", nil)
 	ranked := a.ranker.Rank(ctx, query, allOrganic)
 	if ctx.Err() != nil {
 		return a.partialFromRanked(ranked, plan.SubQueries), nil
@@ -130,7 +116,7 @@ func (a *Agent) runWithReporter(ctx context.Context, query string, personalityPr
 		confidence = "low"
 	}
 
-	progress.Report("synthesizing", nil)
+	a.progress.Report("synthesizing", nil)
 	answer, err := a.synthesizer.Synthesize(ctx, query, ranked, personalityPrompt)
 	if err != nil {
 		return nil, err

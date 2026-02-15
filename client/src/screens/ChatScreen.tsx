@@ -109,12 +109,6 @@ function truncateFileName(name: string, maxChars: number = 22): string {
   return base.slice(0, baseMax) + '...' + ext;
 }
 
-/** Remove source citation markers like [1], [2] from text so they never appear in the UI. */
-function stripCitationNumbers(text: string): string {
-  if (!text) return text;
-  return text.replace(/\s*\[\d+\]\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
-}
-
 /* ------------------------------------------------------------------ */
 /*  Suggestion Chips                                                    */
 /* ------------------------------------------------------------------ */
@@ -125,26 +119,6 @@ const SUGGESTIONS = [
   { label: 'Write me a funny short story', icon: '✍️', color: '#F59E0B' },
   { label: 'Tell me your best joke', icon: '😂', color: '#EC4899' },
 ];
-
-/** Research step labels for progress indicator */
-function researchStepLabel(step: string, current?: number, total?: number, query?: string): string {
-  switch (step) {
-    case 'planning':
-      return 'Planning questions...';
-    case 'searching':
-      if (total != null && total > 0 && current != null) {
-        const q = query ? `: ${query.length > 40 ? query.slice(0, 40) + '…' : query}` : '';
-        return `Searching (${current}/${total})${q}`;
-      }
-      return 'Searching the web...';
-    case 'ranking':
-      return 'Ranking sources...';
-    case 'synthesizing':
-      return 'Writing answer...';
-    default:
-      return 'Researching...';
-  }
-}
 
 /** Slangy "thinking" phrases for GenZ mode typing indicator */
 const GENZ_THINKING_PHRASES = [
@@ -224,15 +198,7 @@ function AgentPopup({
 /*  Sub-components                                                     */
 /* ------------------------------------------------------------------ */
 
-function EmptyState({
-  onSuggestionPress,
-  onSelectWebSearch,
-  onSelectResearch,
-}: {
-  onSuggestionPress: (t: string) => void;
-  onSelectWebSearch?: () => void;
-  onSelectResearch?: () => void;
-}) {
+function EmptyState({ onSuggestionPress }: { onSuggestionPress: (t: string) => void }) {
   const { colors } = useTheme();
   return (
     <View style={emptyStyles.container}>
@@ -241,32 +207,8 @@ function EmptyState({
       </View>
       <Text style={[emptyStyles.title, { color: colors.text }]}>How can I help you?</Text>
       <Text style={[emptyStyles.subtitle, { color: colors.textSecondary }]}>
-        Add Web Browser for search, or Research Analyst for deep research.
+        Pick a suggestion below or type your message.
       </Text>
-      {(onSelectWebSearch || onSelectResearch) && (
-        <View style={emptyStyles.quickActions}>
-          {onSelectWebSearch && (
-            <TouchableOpacity
-              style={[emptyStyles.quickChip, { borderColor: colors.border, backgroundColor: colors.card }]}
-              activeOpacity={0.7}
-              onPress={onSelectWebSearch}
-            >
-              <Globe size={18} color={colors.primary} />
-              <Text style={[emptyStyles.quickChipText, { color: colors.text }]}>Web Search</Text>
-            </TouchableOpacity>
-          )}
-          {onSelectResearch && (
-            <TouchableOpacity
-              style={[emptyStyles.quickChip, { borderColor: colors.border, backgroundColor: colors.card }]}
-              activeOpacity={0.7}
-              onPress={onSelectResearch}
-            >
-              <BrainCircuit size={18} color={colors.primary} />
-              <Text style={[emptyStyles.quickChipText, { color: colors.text }]}>Deep Research</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
       <View style={emptyStyles.suggestions}>
         {SUGGESTIONS.map((s) => (
           <TouchableOpacity
@@ -332,6 +274,44 @@ function GenZThinkingIndicator({ colors }: { colors: ThemeColors }) {
   );
 }
 
+/** One step in the research progress (e.g. "Searching: best laptops 2024") */
+export interface ResearchProgressStep {
+  step: string;
+  query?: string;
+  current?: number;
+  total?: number;
+}
+
+/** Perplexity-style list of live research steps (planning, searching, ranking, writing). */
+function ResearchStepsIndicator({ steps, colors }: { steps: ResearchProgressStep[]; colors: ThemeColors }) {
+  const labels: Record<string, string> = {
+    planning: 'Planning questions...',
+    searching: 'Searching the web',
+    ranking: 'Ranking sources...',
+    synthesizing: 'Writing answer...',
+  };
+  return (
+    <View style={styles.researchStepsContainer}>
+      {steps.map((s, i) => {
+        const label = s.step === 'searching' && s.query
+          ? `Searching: ${s.query}`
+          : labels[s.step] ?? s.step;
+        const sub = s.step === 'searching' && s.total != null && s.current != null
+          ? ` (${s.current}/${s.total})`
+          : '';
+        return (
+          <View key={i} style={[styles.researchStepRow, { borderColor: colors.border }]}>
+            <View style={[styles.researchStepDot, { backgroundColor: colors.primary }]} />
+            <Text style={[styles.researchStepText, { color: colors.text }]} numberOfLines={2}>
+              {label}{sub}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Markdown styles builder                                            */
 /* ------------------------------------------------------------------ */
@@ -385,13 +365,12 @@ function useMarkdownRules(colors: ThemeColors) {
 /*  ChatMessage Row                                                    */
 /* ------------------------------------------------------------------ */
 
-function ChatMessageRow({ item, isStreaming, colors, isDark, mdStyles, markdownRules, onLinkPress, onOpenSources, agentId, researchProgress }: {
-  item: ChatMessage; isStreaming?: boolean; colors: ThemeColors; isDark: boolean; mdStyles: ReturnType<typeof useMdStyles>; markdownRules?: Record<string, (node: { key?: string }, children: React.ReactNode, parent: unknown, styles: Record<string, object>) => React.ReactNode>; onLinkPress?: (url: string) => void; onOpenSources?: (sources: SourceItem[]) => void; agentId?: string; researchProgress?: { step: string; current?: number; total?: number; query?: string } | null;
+function ChatMessageRow({ item, isStreaming, colors, isDark, mdStyles, markdownRules, onLinkPress, onOpenSources, agentId, researchSteps }: {
+  item: ChatMessage; isStreaming?: boolean; colors: ThemeColors; isDark: boolean; mdStyles: ReturnType<typeof useMdStyles>; markdownRules?: Record<string, (node: { key?: string }, children: React.ReactNode, parent: unknown, styles: Record<string, object>) => React.ReactNode>; onLinkPress?: (url: string) => void; onOpenSources?: (sources: SourceItem[]) => void; agentId?: string; researchSteps?: ResearchProgressStep[];
 }) {
   const isUser = item.role === 'user';
   const isGenZMode = agentId === DEFAULT_AGENT_ID;
-  const isResearchMode = agentId === 'brain' || agentId === 'research';
-  const showCursor = !isUser && isStreaming && !!item.fullContent && item.content !== item.fullContent;
+  const showResearchSteps = !isUser && isStreaming && !item.content && researchSteps && researchSteps.length > 0;
   // AI avatar: dark-mode friendly — use a background that contrasts with the icon in both themes
   const assistantAvatarBg = isDark ? colors.surfaceSecondary : colors.text;
   const assistantIconColor = colors.white;
@@ -407,14 +386,10 @@ function ChatMessageRow({ item, isStreaming, colors, isDark, mdStyles, markdownR
       <View style={msgStyles.content}>
         {isUser && <Text style={[msgStyles.roleLabel, { color: colors.text }]}>You</Text>}
         {!isUser && !item.content && isStreaming ? (
-          isGenZMode ? (
+          showResearchSteps ? (
+            <ResearchStepsIndicator steps={researchSteps!} colors={colors} />
+          ) : isGenZMode ? (
             <GenZThinkingIndicator colors={colors} />
-          ) : isResearchMode && researchProgress ? (
-            <View style={[msgStyles.thinkingRow, msgStyles.researchProgress]}>
-              <Text style={[msgStyles.researchProgressText, { color: colors.textSecondary }]}>
-                {researchStepLabel(researchProgress.step, researchProgress.current, researchProgress.total, researchProgress.query)}
-              </Text>
-            </View>
           ) : (
             <View style={msgStyles.thinkingRow}>
               <View style={[msgStyles.thinkingDot, { backgroundColor: colors.textSecondary }]} />
@@ -454,9 +429,8 @@ function ChatMessageRow({ item, isStreaming, colors, isDark, mdStyles, markdownR
                 return true;
               }}
             >
-              {stripCitationNumbers(item.content)}
+              {item.content}
             </Markdown>
-            {showCursor && <BlinkingCursor />}
             {item.researchMeta?.confidence === 'low' && (
               <MessageBanner variant="low_confidence" colors={colors} />
             )}
@@ -478,7 +452,7 @@ function ChatMessageRow({ item, isStreaming, colors, isDark, mdStyles, markdownR
                 <TouchableOpacity
                   style={[msgStyles.copyBtn, { borderColor: colors.border }]}
                   onPress={() => {
-                    const lines = [stripCitationNumbers(item.content), '', 'Sources:'];
+                    const lines = [item.content, '', 'Sources:'];
                     (item.sources ?? []).forEach((s, i) => {
                       lines.push(`${i + 1}. ${s.title || s.link}`, `   ${s.link}`);
                     });
@@ -498,26 +472,6 @@ function ChatMessageRow({ item, isStreaming, colors, isDark, mdStyles, markdownR
       </View>
     </View>
   );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Typewriter hook                                                    */
-/* ------------------------------------------------------------------ */
-
-function useTypewriter(fullText: string, enabled: boolean, charsPerTick = 30, intervalMs = 16): [string, boolean] {
-  const [displayed, setDisplayed] = useState('');
-  const indexRef = useRef(0);
-  useEffect(() => {
-    if (!enabled || !fullText) { setDisplayed(fullText); indexRef.current = fullText.length; return; }
-    indexRef.current = 0; setDisplayed('');
-    const timer = setInterval(() => {
-      indexRef.current = Math.min(indexRef.current + charsPerTick, fullText.length);
-      setDisplayed(fullText.slice(0, indexRef.current));
-      if (indexRef.current >= fullText.length) clearInterval(timer);
-    }, intervalMs);
-    return () => clearInterval(timer);
-  }, [fullText, enabled, charsPerTick, intervalMs]);
-  return [displayed, indexRef.current >= fullText.length];
 }
 
 /* ------------------------------------------------------------------ */
@@ -550,13 +504,11 @@ export function ChatScreen() {
   const defaultAgent = DEFAULT_AGENTS.find((a) => a.id === DEFAULT_AGENT_ID) ?? DEFAULT_AGENTS[0];
   const [selectedAgent, setSelectedAgent] = useState<AgentDef>(defaultAgent);
   const [loadingChat, setLoadingChat] = useState(false);
-  const [animatingMsgId, setAnimatingMsgId] = useState<string | null>(null);
-  const [animatingFullText, setAnimatingFullText] = useState('');
-  const [typewriterText, typewriterDone] = useTypewriter(animatingFullText, !!animatingMsgId, 30, 16);
   const [pendingPDFs, setPendingPDFs] = useState<PendingPDFAttachment[]>([]);
   const [uploadingPDF, setUploadingPDF] = useState(false);
   const [sourcesSheetSources, setSourcesSheetSources] = useState<SourceItem[] | null>(null);
-  const [researchProgress, setResearchProgress] = useState<{ step: string; current?: number; total?: number; query?: string } | null>(null);
+  /** Live research steps for the current streaming message (Perplexity-style). Key = assistant message id. */
+  const [researchSteps, setResearchSteps] = useState<Record<string, ResearchProgressStep[]>>({});
 
   // Load messages when opening a chat from sidebar
   useFocusEffect(
@@ -583,28 +535,15 @@ export function ChatScreen() {
     }, [routeChatId, accessToken])
   );
 
-  useEffect(() => {
-    if (!animatingMsgId || !typewriterText) return;
-    setMessages((prev) => prev.map((msg) => msg.id === animatingMsgId ? { ...msg, content: typewriterText } : msg));
-  }, [typewriterText, animatingMsgId]);
-
-  useEffect(() => {
-    if (typewriterDone && animatingMsgId) { setAnimatingMsgId(null); setAnimatingFullText(''); }
-  }, [typewriterDone, animatingMsgId]);
-
   const scrollToEnd = useCallback(() => { setTimeout(() => { flatListRef.current?.scrollToEnd({ animated: true }); }, 100); }, []);
-
-  useEffect(() => { if (animatingMsgId && typewriterText) scrollToEnd(); }, [typewriterText, animatingMsgId, scrollToEnd]);
 
   const startNewChat = useCallback(() => {
     setChatId(null);
     setMessages([]);
     setInputText('');
     setIsTyping(false);
-    setAnimatingMsgId(null);
-    setAnimatingFullText('');
+    setResearchSteps({});
     setPendingPDFs([]);
-    setResearchProgress(null);
     navigation.setParams({ chatId: undefined } as { chatId?: string });
   }, [navigation]);
 
@@ -668,64 +607,153 @@ export function ChatScreen() {
         ? pendingPDFs.map((p) => p.extracted_text).filter(Boolean).join('\n\n---\n\n')
         : undefined;
       const attachmentIds = hasPDF ? pendingPDFs.map((p) => p.id) : undefined;
-      const isResearch = tools.includes('research');
-      const res = isResearch
-        ? await api.chatCompleteResearchStream(
-            historyForApi,
-            chatId,
-            accessToken,
-            agentId,
-            tools,
-            pdfContext,
-            attachmentIds,
-            (data) => setResearchProgress(data)
-          )
-        : await api.chatComplete(historyForApi, chatId, accessToken, agentId, tools, pdfContext, attachmentIds);
-      setResearchProgress(null);
-      if (res.chat_id) {
-        const wasNewChat = !chatId;
-        setChatId(res.chat_id);
-        refetchChats(accessToken);
-        // Async title is generated on the server; refetch again so sidebar shows it
-        if (wasNewChat && accessToken) {
-          setTimeout(() => refetchChats(accessToken), 2500);
-        }
+      const isResearch = tools?.includes('research');
+
+      if (isResearch && (agentId === 'brain' || agentId === 'research')) {
+        await api.chatCompleteResearchStream(
+          historyForApi,
+          chatId,
+          accessToken,
+          agentId,
+          (event) => {
+            setResearchSteps((prev) => {
+              const list = prev[assistantMsgId] ?? [];
+              const next = list.slice();
+              const detail = event.detail as { current?: number; total?: number; query?: string } | undefined;
+              next.push({
+                step: event.step,
+                query: detail?.query,
+                current: detail?.current,
+                total: detail?.total,
+              });
+              return { ...prev, [assistantMsgId]: next };
+            });
+          },
+          (res) => {
+            if (res.chat_id) {
+              const wasNewChat = !chatId;
+              setChatId(res.chat_id);
+              refetchChats(accessToken);
+              if (wasNewChat && accessToken) setTimeout(() => refetchChats(accessToken), 2500);
+            }
+            const aiContent = res.content?.trim() || "I couldn't generate a response. Please try again.";
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMsgId
+                  ? {
+                      ...msg,
+                      content: aiContent,
+                      fullContent: aiContent,
+                      sources: res.sources,
+                      places: res.places,
+                      images: res.images,
+                      researchMeta: res.research_meta,
+                    }
+                  : msg
+              )
+            );
+            setResearchSteps((prev) => {
+              const next = { ...prev };
+              delete next[assistantMsgId];
+              return next;
+            });
+            setIsTyping(false);
+            if (hasPDF) setPendingPDFs([]);
+            scrollToEnd();
+          },
+          (err) => {
+            setIsTyping(false);
+            setMessages((prev) => prev.map((msg) => msg.id === assistantMsgId ? { ...msg, content: `Sorry, I couldn't complete your request: ${err.message}` } : msg));
+            setResearchSteps((prev) => {
+              const next = { ...prev };
+              delete next[assistantMsgId];
+              return next;
+            });
+            scrollToEnd();
+          },
+          pdfContext,
+          attachmentIds
+        );
+        return;
       }
-      const aiContent = res.content?.trim() || "I couldn't generate a response. Please try again.";
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantMsgId
-            ? {
-                ...msg,
-                fullContent: aiContent,
-                sources: res.sources,
-                places: res.places,
-                images: res.images,
-                researchMeta: res.research_meta,
-              }
-            : msg
-        )
+
+      api.chatCompleteStream(
+        historyForApi,
+        chatId,
+        accessToken,
+        (chunk) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsgId ? { ...msg, content: (msg.content || '') + chunk } : msg
+            )
+          );
+          scrollToEnd();
+        },
+        (newChatId) => {
+          const wasNewChat = !chatId;
+          setChatId(newChatId);
+          refetchChats(accessToken!);
+          if (wasNewChat && accessToken) {
+            setTimeout(() => refetchChats(accessToken), 2500);
+          }
+        },
+        () => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsgId ? { ...msg, fullContent: msg.content } : msg
+            )
+          );
+          setIsTyping(false);
+          if (hasPDF) setPendingPDFs([]);
+          scrollToEnd();
+        },
+        (err) => {
+          setIsTyping(false);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsgId ? { ...msg, content: `Sorry, I couldn't complete your request: ${err.message}` } : msg
+            )
+          );
+          if (hasPDF) setPendingPDFs([]);
+          scrollToEnd();
+        },
+        agentId,
+        pdfContext,
+        attachmentIds
       );
-      setAnimatingMsgId(assistantMsgId); setAnimatingFullText(aiContent); setIsTyping(false);
-      if (hasPDF) setPendingPDFs([]);
+      return;
     } catch (err: unknown) {
-      setResearchProgress(null);
       setIsTyping(false);
       const errMsg = err instanceof Error ? err.message : 'Something went wrong';
       setMessages((prev) => prev.map((msg) => msg.id === assistantMsgId ? { ...msg, content: `Sorry, I couldn't complete your request: ${errMsg}` } : msg));
+      setResearchSteps((prev) => {
+        const next = { ...prev };
+        delete next[assistantMsgId];
+        return next;
+      });
       scrollToEnd();
     }
   }, [inputText, isTyping, messages, scrollToEnd, chatId, accessToken, refetchChats, selectedAgent, pendingPDFs]);
 
   const handleSuggestion = useCallback((text: string) => { sendMessage(text); }, [sendMessage]);
-  const isAnimating = !!animatingMsgId;
 
   const renderItem = useCallback(({ item }: ListRenderItemInfo<ChatMessage>) => (
-    <ChatMessageRow item={item} isStreaming={isTyping || (isAnimating && item.id === animatingMsgId)} colors={colors} isDark={isDark} mdStyles={mdStyles} markdownRules={markdownRules} onLinkPress={openInAppBrowser} onOpenSources={setSourcesSheetSources} agentId={selectedAgent?.id} researchProgress={researchProgress} />
-  ), [isTyping, isAnimating, animatingMsgId, colors, isDark, mdStyles, markdownRules, openInAppBrowser, selectedAgent?.id, researchProgress]);
+    <ChatMessageRow
+      item={item}
+      isStreaming={isTyping}
+      colors={colors}
+      isDark={isDark}
+      mdStyles={mdStyles}
+      markdownRules={markdownRules}
+      onLinkPress={openInAppBrowser}
+      onOpenSources={setSourcesSheetSources}
+      agentId={selectedAgent?.id}
+      researchSteps={researchSteps[item.id]}
+    />
+  ), [isTyping, colors, isDark, mdStyles, markdownRules, openInAppBrowser, selectedAgent?.id, researchSteps]);
 
   const hasMessages = messages.length > 0;
-  const canSend = (inputText.trim().length > 0 || pendingPDFs.length > 0) && !isTyping && !isAnimating;
+  const canSend = (inputText.trim().length > 0 || pendingPDFs.length > 0) && !isTyping;
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
@@ -761,11 +789,7 @@ export function ChatScreen() {
             contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled" onContentSizeChange={() => scrollToEnd()} />
         ) : (
-          <EmptyState
-          onSuggestionPress={handleSuggestion}
-          onSelectWebSearch={() => setSelectedAgent(DEFAULT_AGENTS.find((a) => a.id === 'web')!)}
-          onSelectResearch={() => setSelectedAgent(DEFAULT_AGENTS.find((a) => a.id === 'brain')!)}
-        />
+          <EmptyState onSuggestionPress={handleSuggestion} />
         )}
 
         {/* Input Bar — ChatGPT-style. Attachment pills above input with file name + remove. */}
@@ -815,8 +839,12 @@ export function ChatScreen() {
               elevation: 2,
             },
           ]}>
-            <TouchableOpacity style={styles.inputBarIconBtn} onPress={() => setShowAgents(true)} activeOpacity={0.6}>
-              <Plus size={20} color={colors.textSecondary} strokeWidth={2} />
+            <TouchableOpacity
+              style={[styles.inputBarIconBtn, { backgroundColor: colors.surfaceSecondary }]}
+              onPress={() => setShowAgents(true)}
+              activeOpacity={0.6}
+            >
+              <Plus size={18} color={colors.text} strokeWidth={2} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.inputBarIconBtn}
@@ -824,7 +852,7 @@ export function ChatScreen() {
               disabled={uploadingPDF}
               activeOpacity={0.6}
             >
-              <Paperclip size={20} color={uploadingPDF ? colors.textSecondary : colors.text} />
+              <Paperclip size={18} color={uploadingPDF ? colors.textSecondary : colors.text} strokeWidth={2} />
             </TouchableOpacity>
             <TextInput
               style={[styles.textInput, { color: colors.text }]}
@@ -847,13 +875,23 @@ export function ChatScreen() {
             <TouchableOpacity
               style={[
                 styles.sendBtn,
-                { backgroundColor: canSend ? colors.primary : colors.surfaceSecondary },
+                {
+                  backgroundColor: canSend
+                    ? isDark
+                      ? colors.white
+                      : '#000000'
+                    : colors.surfaceSecondary,
+                },
               ]}
               onPress={() => sendMessage()}
               disabled={!canSend}
               activeOpacity={0.8}
             >
-              <ArrowUp size={20} color={canSend ? colors.white : colors.textSecondary} strokeWidth={2.5} />
+              <ArrowUp
+                size={18}
+                color={canSend ? (isDark ? '#000000' : colors.white) : colors.textSecondary}
+                strokeWidth={2.5}
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -883,39 +921,39 @@ const styles = StyleSheet.create({
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    borderRadius: 24,
+    borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
     paddingLeft: 4,
     paddingRight: 4,
-    paddingTop: 12,
-    paddingBottom: 12,
-    minHeight: 56,
+    paddingTop: 8,
+    paddingBottom: 8,
+    minHeight: 44,
     gap: 2,
   },
   inputBarIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   textInput: {
     flex: 1,
     fontSize: 16,
     lineHeight: 22,
     maxHeight: 120,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
-    paddingHorizontal: 12,
-    marginBottom: 4,
+    paddingVertical: Platform.OS === 'ios' ? 6 : 6,
+    paddingHorizontal: 10,
+    marginBottom: 2,
   },
   sendBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
     marginLeft: 2,
   },
   attachmentPillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
@@ -924,6 +962,10 @@ const styles = StyleSheet.create({
   attachmentPillRemove: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   genzThinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 8 },
   genzThinkingText: { fontSize: 15, lineHeight: 24, fontStyle: 'italic' },
+  researchStepsContainer: { gap: 6, marginTop: 4 },
+  researchStepRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1 },
+  researchStepDot: { width: 6, height: 6, borderRadius: 3 },
+  researchStepText: { fontSize: 13, flex: 1 },
 });
 
 const msgStyles = StyleSheet.create({
@@ -939,8 +981,6 @@ const msgStyles = StyleSheet.create({
   attachmentNameInMsg: { fontSize: 13 },
   thinkingRow: { flexDirection: 'row', gap: 4, paddingVertical: 8 },
   thinkingDot: { width: 8, height: 8, borderRadius: 4 },
-  researchProgress: { paddingVertical: 10 },
-  researchProgressText: { fontSize: 14, fontStyle: 'italic' },
   sourceActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -980,17 +1020,6 @@ const emptyStyles = StyleSheet.create({
   chipIconBox: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   chipIcon: { fontSize: 20 },
   chipText: { fontSize: 15, fontWeight: '500', flex: 1 },
-  quickActions: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  quickChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  quickChipText: { fontSize: 14, fontWeight: '600' },
 });
 
 const popupStyles = StyleSheet.create({

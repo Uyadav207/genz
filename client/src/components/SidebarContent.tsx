@@ -5,6 +5,7 @@
 import React, { useCallback, useEffect } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -14,7 +15,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DrawerContentScrollView, DrawerContentComponentProps } from '@react-navigation/drawer';
-import { MessageCircle, Bot, Settings } from 'lucide-react-native';
+import { MessageCircle, Bot, Settings, MoreVertical } from 'lucide-react-native';
+import { api } from '@/services/api';
 import { Spacing } from '@/constants';
 import { useAuth, useChats, useTheme } from '@/contexts';
 import type { MainTabsParamList } from '@/types';
@@ -57,6 +59,48 @@ export function SidebarContent(props: DrawerContentComponentProps) {
       navigation.navigate('Chat', chatId ? { chatId } : undefined);
     },
     [navigation]
+  );
+
+  const confirmDeleteChat = useCallback(
+    (chatId: string, chatTitle: string) => {
+      Alert.alert(
+        'Delete chat',
+        `Are you sure you want to delete "${chatTitle}"? This cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              if (!accessToken) return;
+              try {
+                await api.deleteChat(chatId, accessToken);
+                refetch(accessToken);
+                navigation.closeDrawer();
+                navigation.navigate('Chat', undefined);
+              } catch {
+                Alert.alert('Error', 'Failed to delete chat. Please try again.');
+              }
+            },
+          },
+        ]
+      );
+    },
+    [accessToken, refetch, navigation]
+  );
+
+  const showChatOptions = useCallback(
+    (chatId: string, chatTitle: string) => {
+      Alert.alert('Options', 'Choose an action', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete chat',
+          style: 'destructive',
+          onPress: () => confirmDeleteChat(chatId, chatTitle),
+        },
+      ]);
+    },
+    [confirmDeleteChat]
   );
 
   return (
@@ -126,16 +170,25 @@ export function SidebarContent(props: DrawerContentComponentProps) {
             </Text>
           ) : (
             chats.map((chat) => (
-              <TouchableOpacity
-                key={chat.id}
-                style={styles.historyItem}
-                onPress={() => openChat(chat.id)}
-                activeOpacity={0.6}
-              >
-                <Text style={[styles.historyItemTitle, { color: colors.text }]} numberOfLines={1}>
-                  {chat.title}
-                </Text>
-              </TouchableOpacity>
+              <View key={chat.id} style={styles.historyItem}>
+                <TouchableOpacity
+                  style={styles.historyItemContent}
+                  onPress={() => openChat(chat.id)}
+                  activeOpacity={0.6}
+                >
+                  <Text style={[styles.historyItemTitle, { color: colors.text }]} numberOfLines={1}>
+                    {chat.title}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={() => showChatOptions(chat.id, chat.title)}
+                  style={styles.moreBtn}
+                  activeOpacity={0.7}
+                >
+                  <MoreVertical size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
             ))
           )}
         </ScrollView>
@@ -201,13 +254,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   historyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 6,
     marginBottom: 2,
+    gap: 8,
+  },
+  historyItemContent: {
+    flex: 1,
   },
   historyItemTitle: {
     fontSize: 14,
     fontWeight: '400',
+  },
+  moreBtn: {
+    padding: 4,
   },
 });

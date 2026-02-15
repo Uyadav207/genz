@@ -190,7 +190,8 @@ export const api = {
     agentId?: string | null,
     tools?: string[],
     pdfContext?: string,
-    attachmentIds?: string[]
+    attachmentIds?: string[],
+    streamProgress?: boolean
   ) =>
     request<ChatResponse>('/chat', {
       method: 'POST',
@@ -199,6 +200,7 @@ export const api = {
         chat_id: chatId || undefined,
         agent_id: agentId ?? DEFAULT_AGENT_ID,
         tools: tools ?? [],
+        stream_progress: streamProgress ?? false,
         pdf_context: pdfContext || undefined,
         attachment_ids: attachmentIds ?? [],
       },
@@ -206,89 +208,102 @@ export const api = {
       timeout: Config.CHAT_TIMEOUT,
     }),
 
-  /** Research with progress stream (SSE). Calls onProgress for each step; resolves with ChatResponse on result. */
+  /** Research with SSE progress. Calls onProgress for each step, onResult with final ChatResponse, or onError. */
   chatCompleteResearchStream: async (
     messages: ChatMessage[],
     chatId: string | null,
     token: string,
     agentId: string,
-    tools: string[],
-    pdfContext: string | undefined,
-    attachmentIds: string[] | undefined,
-    onProgress: (data: { step: string; current?: number; total?: number; query?: string }) => void
-  ): Promise<ChatResponse> => {
+    onProgress: (event: { step: string; detail?: { current?: number; total?: number; query?: string } }) => void,
+    onResult: (data: ChatResponse) => void,
+    onError: (err: Error) => void,
+    pdfContext?: string,
+    attachmentIds?: string[]
+  ): Promise<void> => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), Config.CHAT_TIMEOUT);
-    const url = `${Config.API_BASE_URL}/chat?stream_progress=true`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeaders(token),
-      },
-      body: JSON.stringify({
-        messages,
-        chat_id: chatId || undefined,
-        agent_id: agentId,
-        tools,
-        pdf_context: pdfContext,
-        attachment_ids: attachmentIds ?? [],
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    if (!response.ok) {
-      const errBody = await response.json().catch(() => ({}));
-      throw new Error((errBody as { message?: string }).message || `API error: ${response.status}`);
-    }
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error('No response body');
-    const decoder = new TextDecoder();
-    let buffer = '';
-    const processBlock = (block: string): ChatResponse | null => {
-      let eventType = '';
-      let dataStr = '';
-      for (const line of block.split('\n')) {
-        if (line.startsWith('event:')) eventType = line.slice(6).trim();
-        else if (line.startsWith('data:')) dataStr = line.slice(5).trim();
-      }
-      if (!eventType || !dataStr) return null;
-      const data = JSON.parse(dataStr) as Record<string, unknown>;
-      if (eventType === 'progress') {
-        onProgress({
-          step: (data.step as string) ?? '',
-          current: data.current as number | undefined,
-          total: data.total as number | undefined,
-          query: data.query as string | undefined,
-        });
-        return null;
-      }
-      if (eventType === 'result') return data as unknown as ChatResponse;
-      if (eventType === 'error') {
-        const err = data as { message?: string };
-        throw new Error(err.message ?? 'Research failed');
-      }
-      return null;
-    };
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        if (buffer.trim()) {
-          const result = processBlock(buffer);
-          if (result) return result;
+    try {
+      const res = await fetch(`${Config.API_BASE_URL}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders(token),
+        },
+        body: JSON.stringify({
+          messages,
+          chat_id: chatId || undefined,
+          agent_id: agentId,
+          tools: ['research'],
+          stream_progress: true,
+          pdf_context: pdfContext || undefined,
+          attachment_ids: attachmentIds ?? [],
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        const errBody = await res.text();
+        let msg = `API error: ${res.status}`;
+        try {
+          const j = JSON.parse(errBody);
+          if (j?.message) msg = j.message;
+        } catch {
+          //
         }
-        break;
+        onError(new Error(msg));
+        return;
       }
-      buffer += decoder.decode(value, { stream: true });
-      const blocks = buffer.split('\n\n');
-      buffer = blocks.pop() ?? '';
-      for (const block of blocks) {
-        const result = processBlock(block);
-        if (result) return result;
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) {
+        onError(new Error('Streaming not supported'));
+        return;
       }
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() ?? '';
+        for (const part of parts) {
+          let event = '';
+          let data = '';
+          for (const line of part.split('\n')) {
+            if (line.startsWith('event: ')) event = line.slice(7).trim();
+            else if (line.startsWith('data: ')) data = line.slice(6);
+          }
+          if (!data) continue;
+          if (event === 'progress') {
+            try {
+              const parsed = JSON.parse(data) as { step: string; detail?: { current?: number; total?: number; query?: string } };
+              onProgress(parsed);
+            } catch {
+              //
+            }
+          } else if (event === 'result') {
+            try {
+              const parsed = JSON.parse(data) as ChatResponse;
+              onResult(parsed);
+            } catch (e) {
+              onError(e instanceof Error ? e : new Error(String(e)));
+            }
+            return;
+          } else if (event === 'error') {
+            try {
+              const parsed = JSON.parse(data) as { message?: string };
+              onError(new Error(parsed.message ?? 'Research failed'));
+            } catch {
+              onError(new Error('Research failed'));
+            }
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      clearTimeout(timeout);
+      onError(e instanceof Error ? e : new Error(String(e)));
     }
-    throw new Error('Stream ended without result');
   },
 
   /** Upload PDF for chat context. Returns extracted text and attachment metadata. */
@@ -337,8 +352,12 @@ export const api = {
   getChatMessages: (chatId: string, token: string) =>
     request<{ messages: ChatMessageItem[] }>(`/chats/${chatId}/messages`, { method: 'GET', headers: authHeaders(token) }),
 
-  /** Chat completion with streaming (requires auth). Pass chat_id when continuing. agentId defaults to GenZ Assistant. */
-  chatCompleteStream: async (
+  /** Delete a chat (requires auth) */
+  deleteChat: (chatId: string, token: string) =>
+    request<{ message: string }>(`/chats/${chatId}`, { method: 'DELETE', headers: authHeaders(token) }),
+
+  /** Chat completion with streaming (requires auth). Uses XHR for React Native compatibility. */
+  chatCompleteStream: (
     messages: ChatMessage[],
     chatId: string | null,
     token: string,
@@ -347,65 +366,76 @@ export const api = {
     onComplete: () => void,
     onError: (error: Error) => void,
     agentId?: string | null,
-  ): Promise<void> => {
-    try {
-      const response = await fetch(`${Config.API_BASE_URL}/chat?stream=true`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders(token),
-        },
-        body: JSON.stringify({ messages, chat_id: chatId || undefined, agent_id: agentId ?? DEFAULT_AGENT_ID }),
-      });
+    pdfContext?: string,
+    attachmentIds?: string[],
+  ): void => {
+    const url = `${Config.API_BASE_URL}/chat?stream=true`;
+    const body = JSON.stringify({
+      messages,
+      chat_id: chatId || undefined,
+      agent_id: agentId ?? DEFAULT_AGENT_ID,
+      pdf_context: pdfContext || undefined,
+      attachment_ids: attachmentIds ?? [],
+    });
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.timeout = Config.CHAT_TIMEOUT;
+    xhr.responseType = 'text';
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('Stream not supported');
-      }
+    let buffer = '';
+    let processedLength = 0;
 
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-
-        // Keep the last incomplete line in the buffer
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.trim() === '') continue;
-          if (!line.startsWith('data: ')) continue;
-
-          const data = line.slice(6);
-
-          if (data === '[DONE]') {
-            onComplete();
-            return;
-          }
-
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.chat_id) onChatId(parsed.chat_id);
-            if (parsed.content) onChunk(parsed.content);
-            if (parsed.error) throw new Error(parsed.error);
-          } catch (parseError) {
-            if (parseError instanceof Error && parseError.message !== 'Stream error') throw parseError;
-            console.warn('Failed to parse SSE data:', data);
-          }
+    const processChunk = () => {
+      const text = xhr.responseText;
+      if (!text || text.length <= processedLength) return;
+      buffer += text.slice(processedLength);
+      processedLength = text.length;
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() ?? '';
+      for (const part of parts) {
+        const line = part.split('\n').find((l) => l.startsWith('data: '));
+        if (!line) continue;
+        const data = line.slice(6);
+        if (data === '[DONE]') {
+          onComplete();
+          return;
+        }
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.chat_id) onChatId(parsed.chat_id);
+          if (parsed.content) onChunk(parsed.content);
+          if (parsed.error) throw new Error(parsed.error);
+        } catch (e) {
+          if (e instanceof SyntaxError) continue;
+          if (e instanceof Error && e.message !== 'Stream error') onError(e);
         }
       }
+    };
 
-      onComplete();
-    } catch (error) {
-      onError(error instanceof Error ? error : new Error('Unknown error'));
-    }
+    xhr.onprogress = processChunk;
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState === 3) processChunk();
+      if (xhr.readyState === 4) {
+        processChunk();
+        if (xhr.status >= 200 && xhr.status < 300) {
+          onComplete();
+        } else if (xhr.status !== 0) {
+          let msg = `API error: ${xhr.status}`;
+          try {
+            const err = JSON.parse(xhr.responseText || '{}');
+            if (err?.message) msg = err.message;
+          } catch {
+            //
+          }
+          onError(new Error(msg));
+        }
+      }
+    };
+    xhr.onerror = () => onError(new Error('Network error'));
+    xhr.ontimeout = () => onError(new Error('Request timeout'));
+    xhr.send(body);
   },
 };
