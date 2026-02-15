@@ -1,0 +1,22 @@
+# Environment and secrets (never commit)
+.env
+.env.*
+!.env.example
+server/.env
+client/.env
+client/.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs and temp
+*.log
+*.tmp
+.temp/
