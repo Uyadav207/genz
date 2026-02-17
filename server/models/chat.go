@@ -6,6 +6,7 @@ import "time"
 type Chat struct {
 	ID        string    `json:"id"`
 	UserID    string    `json:"user_id"`
+	AgentID   string    `json:"agent_id,omitempty"` // built-in id (genz, web) or custom agent UUID
 	Title     string    `json:"title"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

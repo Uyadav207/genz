@@ -13,13 +13,14 @@ export type NavigationParamList = {
 
 /** Bottom tab screens inside the authenticated shell */
 export type MainTabsParamList = {
-  Chat: { chatId?: string } | undefined;
+  Chat: { chatId?: string; agentId?: string; agentName?: string; agentIconName?: string } | undefined;
   Agents: undefined;
   Settings: undefined;
 };
 
-/** Stack inside the Agents drawer tab (list + create flow) */
+/** Stack inside the Agents drawer tab (list + create + edit flow) */
 export type AgentsStackParamList = {
   AgentsList: undefined;
   CreateAgent: undefined;
+  EditAgent: { agentId: string };
 };

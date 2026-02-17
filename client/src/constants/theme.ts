@@ -47,3 +47,6 @@ export const BorderRadius = {
   xl: 16,
   full: 9999,
 } as const;
+
+/** Sidebar (drawer) width — sized to fit nav labels + chat list. */
+export const SIDEBAR_WIDTH = 220;

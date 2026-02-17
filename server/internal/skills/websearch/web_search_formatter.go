@@ -1,4 +1,4 @@
-package skills
+package websearch
 
 import (
 	"context"

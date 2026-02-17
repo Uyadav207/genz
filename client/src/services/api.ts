@@ -123,7 +123,19 @@ export interface PDFUploadResult {
 
 export interface ChatListItem {
   id: string;
+  agent_id?: string;
   title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentItem {
+  id: string;
+  name: string;
+  description: string;
+  instruction: string;
+  icon_name: string;
+  skill_ids?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -182,7 +194,7 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     }),
 
-  /** Chat completion (requires auth). Pass chat_id when continuing. agentId defaults to GenZ Assistant. tools triggers web search or research. pdfContext and attachmentIds for PDF attachments. */
+  /** Chat completion (requires auth). Pass chat_id when continuing. agentId defaults to GenZ Assistant. Backend decides skills from agent config. tools override for explicit research. pdfContext and attachmentIds for PDF attachments. */
   chatComplete: (
     messages: ChatMessage[],
     chatId: string | null,
@@ -344,9 +356,32 @@ export const api = {
     return response.json() as Promise<PDFUploadResult>;
   },
 
-  /** List user's chats (requires auth) */
-  getChats: (token: string) =>
-    request<{ chats: ChatListItem[] }>('/chats', { method: 'GET', headers: authHeaders(token) }),
+  /** List user's chats (requires auth). Pass agentId to filter by agent. */
+  getChats: (token: string, agentId?: string | null) =>
+    request<{ chats: ChatListItem[] }>(
+      agentId ? `/chats?agent_id=${encodeURIComponent(agentId)}` : '/chats',
+      { method: 'GET', headers: authHeaders(token) }
+    ),
+
+  /** Custom agents CRUD */
+  createAgent: (payload: { name: string; description?: string; instruction?: string; icon_name?: string; skill_ids?: string[] }, token: string) =>
+    request<{ agent: AgentItem }>('/agents', {
+      method: 'POST',
+      body: payload,
+      headers: authHeaders(token),
+    }),
+  listAgents: (token: string) =>
+    request<{ agents: AgentItem[] }>('/agents', { method: 'GET', headers: authHeaders(token) }),
+  getAgent: (id: string, token: string) =>
+    request<{ agent: AgentItem }>(`/agents/${id}`, { method: 'GET', headers: authHeaders(token) }),
+  updateAgent: (id: string, payload: Partial<{ name: string; description: string; instruction: string; icon_name: string; skill_ids: string[] }>, token: string) =>
+    request<{ agent: AgentItem }>(`/agents/${id}`, {
+      method: 'PUT',
+      body: payload,
+      headers: authHeaders(token),
+    }),
+  deleteAgent: (id: string, token: string) =>
+    request<{ message: string }>(`/agents/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
 
   /** Get messages for a chat (requires auth) */
   getChatMessages: (chatId: string, token: string) =>
@@ -356,7 +391,7 @@ export const api = {
   deleteChat: (chatId: string, token: string) =>
     request<{ message: string }>(`/chats/${chatId}`, { method: 'DELETE', headers: authHeaders(token) }),
 
-  /** Chat completion with streaming (requires auth). Uses XHR for React Native compatibility. */
+  /** Chat completion with streaming (requires auth). Uses XHR for React Native compatibility. onExtra called when sources/places/images from web search. */
   chatCompleteStream: (
     messages: ChatMessage[],
     chatId: string | null,
@@ -368,6 +403,7 @@ export const api = {
     agentId?: string | null,
     pdfContext?: string,
     attachmentIds?: string[],
+    onExtra?: (extra: { sources?: SourceItem[]; places?: PlaceItem[]; images?: ImageItem[] }) => void,
   ): void => {
     const url = `${Config.API_BASE_URL}/chat?stream=true`;
     const body = JSON.stringify({
@@ -407,6 +443,13 @@ export const api = {
           const parsed = JSON.parse(data);
           if (parsed.chat_id) onChatId(parsed.chat_id);
           if (parsed.content) onChunk(parsed.content);
+          if (parsed.sources || parsed.places || parsed.images) {
+            onExtra?.({
+              sources: parsed.sources,
+              places: parsed.places,
+              images: parsed.images,
+            });
+          }
           if (parsed.error) throw new Error(parsed.error);
         } catch (e) {
           if (e instanceof SyntaxError) continue;

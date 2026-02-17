@@ -1,13 +1,15 @@
-package skills
+package websearch
 
 import (
 	"context"
 
 	"github.com/genz/server/internal/clients"
+	"github.com/genz/server/internal/domain"
 	"github.com/genz/server/internal/models"
 )
 
 const (
+	// SkillNameWebSearch is the identifier for the web search skill.
 	SkillNameWebSearch = "web_search"
 	defaultNumResults  = 4 // top 4 search results only
 )
@@ -28,10 +30,10 @@ func (s *WebSearchSkill) Name() string {
 }
 
 // Execute runs the web search based on query intent.
-func (s *WebSearchSkill) Execute(ctx context.Context, input SkillInput) (SkillOutput, error) {
+func (s *WebSearchSkill) Execute(ctx context.Context, input domain.SkillInput) (domain.SkillOutput, error) {
 	query := input.Query
 	if query == "" {
-		return SkillOutput{Error: "query is required"}, nil
+		return domain.SkillOutput{Error: "query is required"}, nil
 	}
 	intent := DetectIntent(query)
 	num := defaultNumResults
@@ -44,15 +46,13 @@ func (s *WebSearchSkill) Execute(ctx context.Context, input SkillInput) (SkillOu
 	case models.SearchTypePlaces:
 		places, err := s.serp.Places(ctx, query, num)
 		if err != nil {
-			return SkillOutput{Error: err.Error()}, err
+			return domain.SkillOutput{Error: err.Error()}, err
 		}
 		resp.Places = places
-		// Organic results for context (top 4)
 		organic, err := s.serp.Search(ctx, query, defaultNumResults)
 		if err == nil && len(organic.Organic) > 0 {
 			resp.Organic = organic.Organic
 		}
-		// Images for the same query (top 4)
 		images, err := s.serp.Images(ctx, query, defaultNumResults)
 		if err == nil && len(images) > 0 {
 			resp.Images = images
@@ -60,10 +60,9 @@ func (s *WebSearchSkill) Execute(ctx context.Context, input SkillInput) (SkillOu
 	case models.SearchTypeImages:
 		images, err := s.serp.Images(ctx, query, num)
 		if err != nil {
-			return SkillOutput{Error: err.Error()}, err
+			return domain.SkillOutput{Error: err.Error()}, err
 		}
 		resp.Images = images
-		// Also get organic for context (top 4)
 		organic, err := s.serp.Search(ctx, query, defaultNumResults)
 		if err == nil && len(organic.Organic) > 0 {
 			resp.Organic = organic.Organic
@@ -71,12 +70,12 @@ func (s *WebSearchSkill) Execute(ctx context.Context, input SkillInput) (SkillOu
 	default:
 		organic, err := s.serp.Search(ctx, query, num)
 		if err != nil {
-			return SkillOutput{Error: err.Error()}, err
+			return domain.SkillOutput{Error: err.Error()}, err
 		}
 		resp.Organic = organic.Organic
 		resp.KnowledgeGraph = organic.KnowledgeGraph
 		resp.PeopleAlsoAsk = organic.PeopleAlsoAsk
 	}
 
-	return SkillOutput{Data: resp}, nil
+	return domain.SkillOutput{Data: resp}, nil
 }

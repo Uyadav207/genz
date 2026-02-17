@@ -7,7 +7,7 @@ import (
 	"github.com/genz/server/internal/agents/research"
 	"github.com/genz/server/internal/clients"
 	"github.com/genz/server/internal/models"
-	"github.com/genz/server/internal/skills"
+	"github.com/genz/server/internal/skills/websearch"
 )
 
 // ResearchService runs the research agent and returns the answer with sources.
@@ -21,7 +21,7 @@ type ResearchService struct {
 func NewResearchService(geminiAPIKey, serpAPIKey string) *ResearchService {
 	gemini := clients.NewGeminiClient(geminiAPIKey)
 	serp := clients.NewSerpClient(serpAPIKey)
-	webSearch := skills.NewWebSearchSkill(serp)
+	webSearch := websearch.NewWebSearchSkill(serp)
 	cfg := research.DefaultConfig()
 	cfg.GeminiAPIKey = geminiAPIKey
 	cfg.SERPAPIKey = serpAPIKey
@@ -44,7 +44,7 @@ func (s *ResearchService) Run(ctx context.Context, query, personalityID string) 
 func (s *ResearchService) RunWithProgress(ctx context.Context, query, personalityID string, rep research.ProgressReporter) (*models.ResearchResponse, error) {
 	gemini := clients.NewGeminiClient(s.geminiAPIKey)
 	serp := clients.NewSerpClient(s.serpAPIKey)
-	webSearch := skills.NewWebSearchSkill(serp)
+	webSearch := websearch.NewWebSearchSkill(serp)
 	cfg := research.DefaultConfig()
 	cfg.GeminiAPIKey = s.geminiAPIKey
 	cfg.SERPAPIKey = s.serpAPIKey

@@ -18,6 +18,9 @@ import (
 	"github.com/genz/server/config"
 	"github.com/genz/server/database"
 	"github.com/genz/server/internal/agents"
+	"github.com/genz/server/internal/clients"
+	"github.com/genz/server/internal/repositories"
+	"github.com/genz/server/internal/skills"
 	"github.com/genz/server/models"
 	"github.com/genz/server/services"
 	"github.com/gin-gonic/gin"
@@ -112,10 +115,14 @@ type geminiGenerateResponse struct {
 // ChatComplete handles POST /api/v1/chat and forwards to Gemini 2.0 Flash.
 // Requires auth. Creates or uses chat_id, saves user + assistant messages, generates title for new chats.
 // Supports streaming via Server-Sent Events (SSE) when stream=true query param is set.
-// Routes agent_id "web" to Web Search, "brain"/"research" to Research Agent.
+// For agents with skills: uses LLM-native tool calling (no orchestrator/selector).
 func ChatComplete(cfg *config.Config) gin.HandlerFunc {
 	webSearchSvc := services.NewWebSearchService(cfg.SERPAPIKey, cfg.GeminiAPIKey)
 	researchSvc := services.NewResearchService(cfg.GeminiAPIKey, cfg.SERPAPIKey)
+	skillDefs := skills.NewDefinitionsRegistry()
+	agentRepo := repositories.NewAgentRepository()
+	resolver := agents.NewResolver(agentRepo)
+	geminiClient := clients.NewGeminiClient(cfg.GeminiAPIKey)
 
 	return func(c *gin.Context) {
 		if cfg.GeminiAPIKey == "" {
@@ -158,7 +165,15 @@ func ChatComplete(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		chatID, isNewChat, err := ensureChatAndSaveUserMessage(c, userID, req.ChatID, lastMsg.Content)
+		agentID := ""
+		if req.AgentID != nil {
+			agentID = *req.AgentID
+		}
+		if agentID == "" {
+			agentID = agents.DefaultAgentID
+		}
+
+		chatID, isNewChat, err := ensureChatAndSaveUserMessage(c, userID, req.ChatID, lastMsg.Content, agentID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":   "database_error",
@@ -187,23 +202,125 @@ func ChatComplete(cfg *config.Config) gin.HandlerFunc {
 			}()
 		}
 
-		agentID := ""
-		if req.AgentID != nil {
-			agentID = *req.AgentID
-		}
-		if agentID == "" {
-			agentID = agents.DefaultAgentID
-		}
-
-		// personalityID: used for formatting; defaults to agentID
 		personalityID := agentID
 
-		hasWebSearch := slices.Contains(req.Tools, "web_search") || agentID == "web"
+		// Resolve agent config (system prompt, skill IDs)
+		agentCfg, resolveErr := resolver.Resolve(c.Request.Context(), agentID, userID)
+		var systemInstruction string
+		var skillIDs []string
+		if resolveErr == nil && agentCfg != nil {
+			systemInstruction = agentCfg.SystemPrompt
+			skillIDs = agentCfg.SkillIDs
+			if systemInstruction == "" && !agents.IsBuiltin(agentID) {
+				systemInstruction = "You are a helpful assistant. Answer based on the user's messages."
+			}
+		} else {
+			if agents.IsBuiltin(agentID) {
+				systemInstruction = agents.GetSystemInstruction(agentID)
+			} else {
+				systemInstruction = "You are a helpful assistant. Answer based on the user's messages."
+			}
+		}
+
+		// LLM tool-calling flow: agents with skills use native function calling
+		tools := skillDefs.GetToolsForSkillIDs(skillIDs)
+		if len(tools) > 0 {
+			modifiers := skillDefs.GetPromptModifiersForSkillIDs(skillIDs)
+			stateBehaviors := skillDefs.GetStateBehaviorsForSkillIDs(skillIDs)
+			fullSystemPrompt := systemInstruction
+			if modifiers != "" {
+				fullSystemPrompt += "\n\nSKILL GUARDRAILS (follow these when deciding to use tools):\n" + modifiers
+			}
+			if stateBehaviors != "" {
+				fullSystemPrompt += "\n\n" + stateBehaviors
+			}
+			fullSystemPrompt += "\n\nBe mindful: only call tools when truly needed. Follow your instructions and guardrails."
+
+			messagesToSend := req.Messages
+			if len(messagesToSend) > maxContextMessages {
+				messagesToSend = messagesToSend[len(messagesToSend)-maxContextMessages:]
+			}
+			if strings.TrimSpace(req.PDFContext) != "" {
+				pdfPrefix := "[User attached a PDF document. Here is its extracted content:\n\n--- PDF Content ---\n" +
+					strings.TrimSpace(req.PDFContext) + "\n--- End PDF ---\n]\n\n"
+				messagesToSend = append([]ChatMessage{}, messagesToSend...)
+				lastIdx := len(messagesToSend) - 1
+				if lastIdx >= 0 && messagesToSend[lastIdx].Role == "user" {
+					messagesToSend[lastIdx].Content = pdfPrefix + "User message: " + messagesToSend[lastIdx].Content
+				}
+			}
+
+			toolContents := make([]clients.ToolChatMessage, 0, len(messagesToSend))
+			for _, m := range messagesToSend {
+				toolContents = append(toolContents, clients.ToolChatMessage{Role: m.Role, Content: m.Content})
+			}
+
+			toolExecutor := buildToolExecutor(webSearchSvc, systemInstruction)
+			result, err := geminiClient.GenerateWithTools(c.Request.Context(), clients.GenerateWithToolsRequest{
+				SystemInstruction: fullSystemPrompt,
+				Contents:          toolContents,
+				Tools:             tools,
+				MaxOutputTokens:   2048,
+			}, toolExecutor)
+			if err != nil {
+				log.Printf("[CHAT] tool-calling error: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error":   "chat_error",
+					"message": err.Error(),
+				})
+				return
+			}
+			extra := result.Extra
+			if extra == nil {
+				extra = make(map[string]interface{})
+			}
+			_ = saveAssistantMessageWithExtra(chatID, result.Content, extra)
+			log.Printf("[CHAT] Tool-calling done: agent_id=%q content_len=%d", agentID, len(result.Content))
+
+			streamEnabled := c.Query("stream") == "true"
+			if streamEnabled {
+				c.Writer.Header().Set("Content-Type", "text/event-stream")
+				c.Writer.Header().Set("Cache-Control", "no-cache")
+				c.Writer.Header().Set("Connection", "keep-alive")
+				c.Writer.Header().Set("X-Accel-Buffering", "no")
+				c.Writer.WriteHeader(http.StatusOK)
+				writer := c.Writer
+				fmt.Fprintf(writer, "data: %s\n\n", jsonMustMarshal(map[string]string{"chat_id": chatID}))
+				contentPayload := map[string]interface{}{"content": result.Content}
+				if len(extra) > 0 {
+					if s, ok := extra["sources"]; ok {
+						contentPayload["sources"] = s
+					}
+					if p, ok := extra["places"]; ok {
+						contentPayload["places"] = p
+					}
+					if i, ok := extra["images"]; ok {
+						contentPayload["images"] = i
+					}
+				}
+				fmt.Fprintf(writer, "data: %s\n\n", jsonMustMarshal(contentPayload))
+				fmt.Fprintf(writer, "data: [DONE]\n\n")
+				if flusher, ok := writer.(http.Flusher); ok {
+					flusher.Flush()
+				}
+				return
+			}
+			resp := gin.H{"chat_id": chatID, "content": result.Content}
+			if len(extra) > 0 {
+				for k, v := range extra {
+					resp[k] = v
+				}
+			}
+			c.JSON(http.StatusOK, resp)
+			return
+		}
+
+		hasWebSearch := slices.Contains(req.Tools, "web_search")
 		hasResearch := slices.Contains(req.Tools, "research") || agentID == "brain" || agentID == "research"
 
-		log.Printf("[CHAT] agent_id=%q tools=%v hasWebSearch=%v hasResearch=%v", agentID, req.Tools, hasWebSearch, hasResearch)
+		log.Printf("[CHAT] agent_id=%q tools=%v hasWebSearch=%v hasResearch=%v (fallback)", agentID, req.Tools, hasWebSearch, hasResearch)
 
-		// Route Web Search (agent_id: web or tools: web_search)
+		// Route Web Search (explicit req.Tools) — when agent has no skills but client passes tools: ["web_search"]
 		if hasWebSearch {
 			log.Printf("[CHAT] Routing to WEB SEARCH, query=%q personality=%q", lastMsg.Content, personalityID)
 			if cfg.SERPAPIKey == "" {
@@ -324,6 +441,8 @@ func ChatComplete(cfg *config.Config) gin.HandlerFunc {
 		}
 
 		log.Printf("[CHAT] Routing to DEFAULT chat flow, agent_id=%q", agentID)
+		// systemInstruction and agentCfg already resolved above; use them for default flow
+
 		// Default: standard chat flow
 		// Use a sliding context window: only the last N messages so the model stays focused and is less likely to hallucinate
 		messagesToSend := req.Messages
@@ -359,7 +478,7 @@ func ChatComplete(cfg *config.Config) gin.HandlerFunc {
 		body := geminiGenerateRequest{
 			SystemInstruction: &geminiSystemInstruction{
 				Role:  "system",
-				Parts: []geminiPart{{Text: agents.GetSystemInstruction(agentID)}},
+				Parts: []geminiPart{{Text: systemInstruction}},
 			},
 			Contents: contents,
 			GenerationConfig: &struct {
@@ -405,6 +524,41 @@ func ChatComplete(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
+// buildToolExecutor returns a ToolExecutor that executes skills (web_search, memory).
+func buildToolExecutor(webSearchSvc *services.WebSearchService, systemPrompt string) clients.ToolExecutor {
+	return func(ctx context.Context, name string, args map[string]interface{}) (map[string]interface{}, error) {
+		switch name {
+		case "web_search":
+			query, _ := args["query"].(string)
+			if query == "" {
+				return map[string]interface{}{"error": "query is required"}, nil
+			}
+			if webSearchSvc == nil {
+				return map[string]interface{}{"error": "Web search is not configured"}, nil
+			}
+			result, err := webSearchSvc.RunWithSystemPrompt(ctx, query, systemPrompt)
+			if err != nil {
+				return map[string]interface{}{"error": err.Error()}, nil
+			}
+			res := map[string]interface{}{"answer": result.Answer}
+			if len(result.Sources) > 0 {
+				res["sources"] = result.Sources
+			}
+			if len(result.Places) > 0 {
+				res["places"] = result.Places
+			}
+			if len(result.Images) > 0 {
+				res["images"] = result.Images
+			}
+			return res, nil
+		case "memory":
+			return map[string]interface{}{"message": "Memory feature is coming soon."}, nil
+		default:
+			return map[string]interface{}{"error": "unknown tool: " + name}, nil
+		}
+	}
+}
+
 // getUserID returns the authenticated user's ID from context.
 func getUserID(c *gin.Context) (string, error) {
 	uid, exists := c.Get("userID")
@@ -419,7 +573,7 @@ func getUserID(c *gin.Context) (string, error) {
 }
 
 // ensureChatAndSaveUserMessage creates a new chat (if no chat_id) or verifies ownership, then saves the user message. Returns (chatID, isNewChat, error).
-func ensureChatAndSaveUserMessage(c *gin.Context, userID string, chatIDPtr *string, userContent string) (chatID string, isNewChat bool, err error) {
+func ensureChatAndSaveUserMessage(c *gin.Context, userID string, chatIDPtr *string, userContent string, agentID string) (chatID string, isNewChat bool, err error) {
 	db := database.GetAdminClient().DB
 
 	if chatIDPtr != nil && *chatIDPtr != "" {
@@ -430,8 +584,11 @@ func ensureChatAndSaveUserMessage(c *gin.Context, userID string, chatIDPtr *stri
 		}
 		chatID = *chatIDPtr
 	} else {
-		// Create new chat
+		// Create new chat with agent_id
 		row := map[string]interface{}{"user_id": userID, "title": "New chat"}
+		if agentID != "" {
+			row["agent_id"] = agentID
+		}
 		var created []models.Chat
 		err = db.From("chats").Insert(row).Execute(&created)
 		if err != nil {
@@ -530,6 +687,7 @@ func handleStreamingResponse(c *gin.Context, resp *http.Response, cfg *config.Co
 	writer.Flush()
 
 	var fullContent strings.Builder
+	var sentAnyChunk bool
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -544,11 +702,17 @@ func handleStreamingResponse(c *gin.Context, resp *http.Response, cfg *config.Co
 				fullContent.WriteString(text)
 				fmt.Fprintf(writer, "data: %s\n\n", jsonMustMarshal(map[string]string{"content": text}))
 				writer.Flush()
+				sentAnyChunk = true
 			}
 		}
 	}
 
 	content := fullContent.String()
+	// If client never got any chunk (e.g. buffered response), send full content once so UI shows the reply
+	if !sentAnyChunk && content != "" {
+		fmt.Fprintf(writer, "data: %s\n\n", jsonMustMarshal(map[string]string{"content": content}))
+		writer.Flush()
+	}
 	_ = saveAssistantMessage(chatID, content)
 	// Async: update chat title from first user message so sidebar shows it when ready
 	if isNewChat && firstUserMessage != "" {
@@ -616,22 +780,46 @@ func jsonMustMarshal(v interface{}) string {
 	return string(b)
 }
 
-// ListChats returns all chats for the authenticated user, ordered by updated_at desc.
-// GET /api/v1/chats
+// defaultAgentIDs are agent_ids that share one chat history (GenZ + General).
+var defaultAgentIDs = []string{"genz", "general"}
+
+// ListChats returns all chats for the authenticated user, optionally filtered by agent_id, ordered by updated_at desc.
+// GET /api/v1/chats?agent_id= optional filter.
+// When agent_id is empty, "genz", or "general", returns chats where agent_id is genz or general (shared default history).
+// When agent_id is a custom UUID, returns only that agent's chats.
 func ListChats(c *gin.Context) {
 	userID, err := getUserID(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": err.Error()})
 		return
 	}
+	agentID := c.Query("agent_id")
 	var chats []models.Chat
-	err = database.GetAdminClient().DB.From("chats").
-		Select("id,title,created_at,updated_at").
-		Eq("user_id", userID).
-		Execute(&chats)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "database_error", "message": err.Error()})
-		return
+	if agentID == "" || agentID == "genz" || agentID == "general" {
+		// Shared default history: fetch chats for both genz and general, then merge and sort.
+		for _, id := range defaultAgentIDs {
+			var part []models.Chat
+			q := database.GetAdminClient().DB.From("chats").
+				Select("id,agent_id,title,created_at,updated_at").
+				Eq("user_id", userID).
+				Eq("agent_id", id)
+			err = q.Execute(&part)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "database_error", "message": err.Error()})
+				return
+			}
+			chats = append(chats, part...)
+		}
+	} else {
+		q := database.GetAdminClient().DB.From("chats").
+			Select("id,agent_id,title,created_at,updated_at").
+			Eq("user_id", userID).
+			Eq("agent_id", agentID)
+		err = q.Execute(&chats)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "database_error", "message": err.Error()})
+			return
+		}
 	}
 	sort.Slice(chats, func(i, j int) bool { return chats[j].UpdatedAt.Before(chats[i].UpdatedAt) })
 	c.JSON(http.StatusOK, gin.H{"chats": chats})

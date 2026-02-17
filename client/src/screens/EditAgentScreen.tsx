@@ -1,8 +1,8 @@
 /**
- * Create Agent screen — customize name, behaviour, skills, and other options.
+ * Edit Agent screen — update name, behaviour, skills.
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,29 +16,64 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Check } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import { FontSize, Spacing, DEFAULT_SKILLS, AGENT_EMOJI_OPTIONS, EMOJI_ICON_PREFIX } from '@/constants';
 import { api } from '@/services/api';
 import { useTheme, useAuth } from '@/contexts';
 import type { AgentsStackParamList } from '@/types';
 
-type Nav = NativeStackNavigationProp<AgentsStackParamList, 'CreateAgent'>;
+type Nav = NativeStackNavigationProp<AgentsStackParamList, 'EditAgent'>;
+type Route = RouteProp<AgentsStackParamList, 'EditAgent'>;
 
 const SKILL_OPTIONS = DEFAULT_SKILLS;
 
-export function CreateAgentScreen() {
+export function EditAgentScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { accessToken } = useAuth();
   const navigation = useNavigation<Nav>();
+  const route = useRoute<Route>();
+  const { agentId } = route.params;
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [instruction, setInstruction] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
-  const [selectedSkillIds, setSelectedSkillIds] = useState<Set<string>>(new Set(['web_search', 'memory']));
+  const [selectedSkillIds, setSelectedSkillIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const loadAgent = useCallback(async () => {
+    if (!accessToken || !agentId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const { agent } = await api.getAgent(agentId, accessToken);
+      if (agent) {
+        setName(agent.name);
+        setDescription(agent.description || '');
+        setInstruction(agent.instruction || '');
+        setSelectedSkillIds(new Set(agent.skill_ids || []));
+        const icon = agent.icon_name || '';
+        setSelectedEmoji(icon.startsWith(EMOJI_ICON_PREFIX) ? icon.slice(EMOJI_ICON_PREFIX.length) : null);
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to load agent.');
+      navigation.goBack();
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken, agentId, navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAgent();
+    }, [loadAgent])
+  );
 
   const toggleSkill = (id: string) => {
     setSelectedSkillIds((prev) => {
@@ -50,10 +85,11 @@ export function CreateAgentScreen() {
   };
 
   const handleSave = async () => {
-    if (!name.trim() || !accessToken || saving) return;
+    if (!name.trim() || !accessToken || saving || !agentId) return;
     setSaving(true);
     try {
-      await api.createAgent(
+      await api.updateAgent(
+        agentId,
         {
           name: name.trim(),
           description: description.trim(),
@@ -65,23 +101,27 @@ export function CreateAgentScreen() {
       );
       navigation.goBack();
     } catch {
-      Alert.alert('Error', 'Failed to create agent. Please try again.');
+      Alert.alert('Error', 'Failed to update agent. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
+  if (loading) {
+    return (
+      <View style={[styles.loadingRoot, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <ArrowLeft size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Create agent</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Edit agent</Text>
         <TouchableOpacity
           style={[styles.saveBtn, (!name.trim() || saving) && { opacity: 0.5 }]}
           onPress={handleSave}
@@ -141,9 +181,7 @@ export function CreateAgentScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>Description</Text>
-          <Text style={[styles.hint, { color: colors.textSecondary }]}>
-            How would you describe this agent to others?
-          </Text>
+          <Text style={[styles.hint, { color: colors.textSecondary }]}>How would you describe this agent to others?</Text>
           <TextInput
             style={[styles.input, styles.inputMultiline, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceSecondary }]}
             placeholder="e.g. Helps with deep research and summarising papers"
@@ -173,19 +211,14 @@ export function CreateAgentScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>Skills</Text>
-          <Text style={[styles.hint, { color: colors.textSecondary }]}>
-            Choose what this agent can use by default.
-          </Text>
+          <Text style={[styles.hint, { color: colors.textSecondary }]}>Choose what this agent can use by default.</Text>
           <View style={styles.skillsList}>
             {SKILL_OPTIONS.map((skill) => {
               const enabled = selectedSkillIds.has(skill.id);
               return (
                 <View
                   key={skill.id}
-                  style={[
-                    styles.skillRow,
-                    { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
-                  ]}
+                  style={[styles.skillRow, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
                 >
                   <View style={styles.skillText}>
                     <Text style={[styles.skillLabel, { color: colors.text }]}>{skill.label}</Text>
@@ -209,6 +242,7 @@ export function CreateAgentScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  loadingRoot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

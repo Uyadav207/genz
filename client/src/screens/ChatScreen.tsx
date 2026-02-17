@@ -9,9 +9,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Linking,
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,8 +23,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowUp,
   Menu,
-  MessageCircle,
-  Plus,
   X,
   Bot,
   Code,
@@ -34,6 +30,7 @@ import {
   ImageIcon,
   BrainCircuit,
   Globe,
+  Sparkles,
   User,
   SquarePen,
   Paperclip,
@@ -46,8 +43,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { DrawerNavigationProp } from '@react-navigation/drawer';
 import type { MainTabsParamList } from '@/types';
-import { DEFAULT_AGENT_ID, DEFAULT_AGENTS, FontSize, Spacing, AGENT_ICON_COLORS } from '@/constants';
-import type { AgentDef } from '@/constants';
+import { DEFAULT_AGENT_ID, DEFAULT_AGENTS, FontSize, Spacing, AGENT_ICON_COLORS, AGENT_EMPTY_GREETING, AGENTS_WITH_ACTION_CARDS } from '@/constants';
 import { useTheme, useAuth, useChats } from '@/contexts';
 import type { ThemeColors } from '@/contexts';
 import Markdown from 'react-native-markdown-display';
@@ -138,10 +134,12 @@ const GENZ_THINKING_PHRASES = [
 /*  Agent icon (uses shared DEFAULT_AGENTS / AGENT_ICON_COLORS)        */
 /* ------------------------------------------------------------------ */
 
+const EMOJI_PREFIX = 'emoji:';
+
 function AgentIcon({ name, size = 22 }: { name: string; size?: number }) {
   const color = AGENT_ICON_COLORS[name] || '#6C63FF';
   switch (name) {
-    case 'genz': return <Bot size={size} color={color} />;
+    case 'genz': return <Sparkles size={size} color={color} />;
     case 'code': return <Code size={size} color={color} />;
     case 'pen': return <PenLine size={size} color={color} />;
     case 'image': return <ImageIcon size={size} color={color} />;
@@ -151,59 +149,25 @@ function AgentIcon({ name, size = 22 }: { name: string; size?: number }) {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/*  Agent Popup                                                        */
-/* ------------------------------------------------------------------ */
-
-function AgentPopup({
-  visible, onClose, onSelect,
-}: { visible: boolean; onClose: () => void; onSelect: (a: AgentDef) => void }) {
-  const { colors } = useTheme();
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={popupStyles.overlay} onPress={onClose}>
-        <Pressable style={[popupStyles.sheet, { backgroundColor: colors.background }]} onPress={(e) => e.stopPropagation()}>
-          <View style={popupStyles.header}>
-            <Text style={[popupStyles.title, { color: colors.text }]}>Add Agent</Text>
-            <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
-              <X size={22} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-          <Text style={[popupStyles.subtitle, { color: colors.textSecondary }]}>
-            Choose an agent to assist in this conversation
-          </Text>
-          <View style={popupStyles.list}>
-            {DEFAULT_AGENTS.map((agent) => (
-              <TouchableOpacity
-                key={agent.id} style={popupStyles.agentRow} activeOpacity={0.65}
-                onPress={() => { onSelect(agent); onClose(); }}
-              >
-                <View style={[popupStyles.agentIconBox, { backgroundColor: colors.surfaceSecondary }]}>
-                  <AgentIcon name={agent.iconName} />
-                </View>
-                <View style={popupStyles.agentInfo}>
-                  <Text style={[popupStyles.agentName, { color: colors.text }]}>{agent.name}</Text>
-                  <Text style={[popupStyles.agentDesc, { color: colors.textSecondary }]}>{agent.description}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
+/** Renders agent icon (Lucide) or emoji when iconName is "emoji:😀". */
+function AgentIconOrEmoji({ iconName, size = 32 }: { iconName: string; size?: number }) {
+  if (iconName.startsWith(EMOJI_PREFIX)) {
+    return <Text style={{ fontSize: size }}>{iconName.slice(EMOJI_PREFIX.length)}</Text>;
+  }
+  return <AgentIcon name={iconName} size={size} />;
 }
 
 /* ------------------------------------------------------------------ */
-/*  Sub-components                                                     */
+/*  Empty states                                                        */
 /* ------------------------------------------------------------------ */
 
-function EmptyState({ onSuggestionPress }: { onSuggestionPress: (t: string) => void }) {
+/** Empty state with 4 action cards (GenZ / General only). */
+function EmptyStateWithCards({ iconName, onSuggestionPress }: { iconName: string; onSuggestionPress: (t: string) => void }) {
   const { colors } = useTheme();
   return (
     <View style={emptyStyles.container}>
       <View style={[emptyStyles.iconCircle, { backgroundColor: colors.surfaceSecondary }]}>
-        <Text style={{ fontSize: 32 }}>{'👋'}</Text>
+        <AgentIconOrEmoji iconName={iconName} size={32} />
       </View>
       <Text style={[emptyStyles.title, { color: colors.text }]}>How can I help you?</Text>
       <Text style={[emptyStyles.subtitle, { color: colors.textSecondary }]}>
@@ -224,6 +188,20 @@ function EmptyState({ onSuggestionPress }: { onSuggestionPress: (t: string) => v
           </TouchableOpacity>
         ))}
       </View>
+    </View>
+  );
+}
+
+/** Empty state with agent name + personalized greeting only (no action cards). */
+function EmptyStatePersonalized({ agentName, greeting, iconName }: { agentName: string; greeting: string; iconName: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={emptyStyles.container}>
+      <View style={[emptyStyles.iconCircle, { backgroundColor: colors.surfaceSecondary }]}>
+        <AgentIconOrEmoji iconName={iconName} size={32} />
+      </View>
+      <Text style={[emptyStyles.title, { color: colors.text }]}>{agentName}</Text>
+      <Text style={[emptyStyles.subtitle, { color: colors.textSecondary }]}>{greeting}</Text>
     </View>
   );
 }
@@ -437,36 +415,46 @@ function ChatMessageRow({ item, isStreaming, colors, isDark, mdStyles, markdownR
             {item.researchMeta?.partial && (
               <MessageBanner variant="partial" colors={colors} />
             )}
-            {item.sources && item.sources.length > 0 && (
-              <View style={msgStyles.sourceActionsRow}>
-                <TouchableOpacity
-                  style={[msgStyles.sourcesBtn, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
-                  onPress={() => onOpenSources?.(item.sources!)}
-                  activeOpacity={0.7}
-                >
-                  <BookOpen size={16} color={colors.primary} />
-                  <Text style={[msgStyles.sourcesBtnText, { color: colors.primary }]}>
-                    Sources ({item.sources.length})
+            {(item.sources?.length || item.places?.length || item.images?.length) ? (
+              <View style={msgStyles.webResultsSection}>
+                <View style={[msgStyles.webResultsHeader, { borderBottomColor: colors.border }]}>
+                  <Globe size={14} color={colors.primary} />
+                  <Text style={[msgStyles.webResultsTitle, { color: colors.textSecondary }]}>
+                    Web search results
                   </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[msgStyles.copyBtn, { borderColor: colors.border }]}
-                  onPress={() => {
-                    const lines = [item.content, '', 'Sources:'];
-                    (item.sources ?? []).forEach((s, i) => {
-                      lines.push(`${i + 1}. ${s.title || s.link}`, `   ${s.link}`);
-                    });
-                    Clipboard.setStringAsync(lines.join('\n')).catch(() => {});
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Copy size={14} color={colors.textSecondary} />
-                  <Text style={[msgStyles.copyBtnText, { color: colors.textSecondary }]}>Copy</Text>
-                </TouchableOpacity>
+                </View>
+                {item.sources && item.sources.length > 0 && (
+                  <View style={msgStyles.sourceActionsRow}>
+                    <TouchableOpacity
+                      style={[msgStyles.sourcesBtn, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
+                      onPress={() => onOpenSources?.(item.sources!)}
+                      activeOpacity={0.7}
+                    >
+                      <BookOpen size={16} color={colors.primary} />
+                      <Text style={[msgStyles.sourcesBtnText, { color: colors.primary }]}>
+                        Sources ({item.sources.length})
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[msgStyles.copyBtn, { borderColor: colors.border }]}
+                      onPress={() => {
+                        const lines = [item.content, '', 'Sources:'];
+                        (item.sources ?? []).forEach((s, i) => {
+                          lines.push(`${i + 1}. ${s.title || s.link}`, `   ${s.link}`);
+                        });
+                        Clipboard.setStringAsync(lines.join('\n')).catch(() => {});
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Copy size={14} color={colors.textSecondary} />
+                      <Text style={[msgStyles.copyBtnText, { color: colors.textSecondary }]}>Copy</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {item.places && item.places.length > 0 && <PlaceCards places={item.places} colors={colors} onLinkPress={onLinkPress} />}
+                {item.images && item.images.length > 0 && <ImageGallery images={item.images} colors={colors} onLinkPress={onLinkPress} />}
               </View>
-            )}
-            {item.places && item.places.length > 0 && <PlaceCards places={item.places} colors={colors} onLinkPress={onLinkPress} />}
-            {item.images && item.images.length > 0 && <ImageGallery images={item.images} colors={colors} onLinkPress={onLinkPress} />}
+            ) : null}
           </>
         )}
       </View>
@@ -482,7 +470,7 @@ export function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { accessToken } = useAuth();
-  const { chats, refetch: refetchChats } = useChats();
+  const { chats, refetch: refetchChats, setAgentId } = useChats();
   const navigation = useNavigation<DrawerNavigationProp<MainTabsParamList, 'Chat'>>();
   const openInAppBrowser = useCallback((url: string) => {
     if (url && /^https?:\/\//i.test(url)) {
@@ -490,7 +478,9 @@ export function ChatScreen() {
     }
   }, [navigation]);
   const route = useRoute();
-  const routeChatId = (route.params as { chatId?: string } | undefined)?.chatId;
+  const routeParams = route.params as { chatId?: string; agentId?: string; agentName?: string; agentIconName?: string } | undefined;
+  const routeChatId = routeParams?.chatId;
+  const routeAgentId = routeParams?.agentId;
   const [chatId, setChatId] = useState<string | null>(null);
   const activeChatId = routeChatId ?? chatId;
   const currentChatTitle = activeChatId ? (chats.find((c) => c.id === activeChatId)?.title ?? 'New chat') : 'New chat';
@@ -500,15 +490,44 @@ export function ChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [showAgents, setShowAgents] = useState(false);
-  const defaultAgent = DEFAULT_AGENTS.find((a) => a.id === DEFAULT_AGENT_ID) ?? DEFAULT_AGENTS[0];
-  const [selectedAgent, setSelectedAgent] = useState<AgentDef>(defaultAgent);
   const [loadingChat, setLoadingChat] = useState(false);
+
+  const effectiveAgentId = routeAgentId ?? DEFAULT_AGENT_ID;
+  const effectiveAgentDef = useMemo(() => {
+    const fromDefaults = DEFAULT_AGENTS.find((a) => a.id === effectiveAgentId);
+    if (fromDefaults) return fromDefaults;
+    return {
+      id: effectiveAgentId,
+      name: routeParams?.agentName ?? 'Agent',
+      description: '',
+      iconName: (routeParams?.agentIconName as string) || 'bot',
+    };
+  }, [effectiveAgentId, routeParams?.agentName, routeParams?.agentIconName]);
+  const showActionCards = AGENTS_WITH_ACTION_CARDS.includes(effectiveAgentId);
+  const emptyStateGreeting = useMemo(() => {
+    if (AGENT_EMPTY_GREETING[effectiveAgentId]) return AGENT_EMPTY_GREETING[effectiveAgentId];
+    return `${effectiveAgentDef.name} — how can I help you today?`;
+  }, [effectiveAgentId, effectiveAgentDef.name]);
   const [pendingPDFs, setPendingPDFs] = useState<PendingPDFAttachment[]>([]);
   const [uploadingPDF, setUploadingPDF] = useState(false);
   const [sourcesSheetSources, setSourcesSheetSources] = useState<SourceItem[] | null>(null);
   /** Live research steps for the current streaming message (Perplexity-style). Key = assistant message id. */
   const [researchSteps, setResearchSteps] = useState<Record<string, ResearchProgressStep[]>>({});
+
+  // Sync route agentId to ChatsContext for agent-scoped chat list
+  useEffect(() => {
+    setAgentId(routeAgentId ?? null);
+    if (accessToken) refetchChats(accessToken, routeAgentId ?? null);
+  }, [routeAgentId, accessToken, setAgentId, refetchChats]);
+
+  // When user selects an agent (no existing chatId in route), always start a new chat
+  useEffect(() => {
+    if (routeChatId != null) return; // Opening an existing chat from sidebar — don't reset
+    setChatId(null);
+    setMessages([]);
+    setResearchSteps({});
+    navigation.setParams({ chatId: undefined } as { chatId?: string });
+  }, [routeAgentId, routeChatId, navigation]);
 
   // Load messages when opening a chat from sidebar
   useFocusEffect(
@@ -596,7 +615,7 @@ export function ChatScreen() {
         role: m.role as 'user' | 'assistant',
         content: m.content,
       }));
-      const agentId = selectedAgent?.id ?? DEFAULT_AGENT_ID;
+      const agentId = effectiveAgentId;
       const tools =
         agentId === 'web'
           ? ['web_search']
@@ -633,8 +652,8 @@ export function ChatScreen() {
             if (res.chat_id) {
               const wasNewChat = !chatId;
               setChatId(res.chat_id);
-              refetchChats(accessToken);
-              if (wasNewChat && accessToken) setTimeout(() => refetchChats(accessToken), 2500);
+              refetchChats(accessToken, effectiveAgentId);
+              if (wasNewChat && accessToken) setTimeout(() => refetchChats(accessToken, effectiveAgentId), 2500);
             }
             const aiContent = res.content?.trim() || "I couldn't generate a response. Please try again.";
             setMessages((prev) =>
@@ -692,9 +711,9 @@ export function ChatScreen() {
         (newChatId) => {
           const wasNewChat = !chatId;
           setChatId(newChatId);
-          refetchChats(accessToken!);
+          refetchChats(accessToken!, effectiveAgentId);
           if (wasNewChat && accessToken) {
-            setTimeout(() => refetchChats(accessToken), 2500);
+            setTimeout(() => refetchChats(accessToken, effectiveAgentId), 2500);
           }
         },
         () => {
@@ -719,7 +738,24 @@ export function ChatScreen() {
         },
         agentId,
         pdfContext,
-        attachmentIds
+        attachmentIds,
+        (extra) => {
+          if (extra.sources || extra.places || extra.images) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMsgId
+                  ? {
+                      ...msg,
+                      sources: extra.sources ?? msg.sources,
+                      places: extra.places ?? msg.places,
+                      images: extra.images ?? msg.images,
+                    }
+                  : msg
+              )
+            );
+            scrollToEnd();
+          }
+        }
       );
       return;
     } catch (err: unknown) {
@@ -733,7 +769,7 @@ export function ChatScreen() {
       });
       scrollToEnd();
     }
-  }, [inputText, isTyping, messages, scrollToEnd, chatId, accessToken, refetchChats, selectedAgent, pendingPDFs]);
+  }, [inputText, isTyping, messages, scrollToEnd, chatId, accessToken, refetchChats, effectiveAgentId, pendingPDFs]);
 
   const handleSuggestion = useCallback((text: string) => { sendMessage(text); }, [sendMessage]);
 
@@ -747,10 +783,10 @@ export function ChatScreen() {
       markdownRules={markdownRules}
       onLinkPress={openInAppBrowser}
       onOpenSources={setSourcesSheetSources}
-      agentId={selectedAgent?.id}
+      agentId={effectiveAgentId}
       researchSteps={researchSteps[item.id]}
     />
-  ), [isTyping, colors, isDark, mdStyles, markdownRules, openInAppBrowser, selectedAgent?.id, researchSteps]);
+  ), [isTyping, colors, isDark, mdStyles, markdownRules, openInAppBrowser, effectiveAgentId, researchSteps]);
 
   const hasMessages = messages.length > 0;
   const canSend = (inputText.trim().length > 0 || pendingPDFs.length > 0) && !isTyping;
@@ -788,8 +824,10 @@ export function ChatScreen() {
           <FlatList ref={flatListRef} data={messages} renderItem={renderItem} keyExtractor={(m) => m.id}
             contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled" onContentSizeChange={() => scrollToEnd()} />
+        ) : showActionCards ? (
+          <EmptyStateWithCards iconName={effectiveAgentDef.iconName} onSuggestionPress={handleSuggestion} />
         ) : (
-          <EmptyState onSuggestionPress={handleSuggestion} />
+          <EmptyStatePersonalized agentName={effectiveAgentDef.name} greeting={emptyStateGreeting} iconName={effectiveAgentDef.iconName} />
         )}
 
         {/* Input Bar — ChatGPT-style. Attachment pills above input with file name + remove. */}
@@ -814,19 +852,6 @@ export function ChatScreen() {
               ))}
             </View>
           )}
-          {selectedAgent.id !== DEFAULT_AGENT_ID && (
-            <View style={styles.agentBadgeRow}>
-              <View style={[styles.agentBadge, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
-                <AgentIcon name={selectedAgent.iconName} size={16} />
-                <Text style={[styles.agentBadgeText, { color: colors.text }]}>
-                  {selectedAgent.id === 'web' ? 'Web' : selectedAgent.id === 'brain' ? 'Research' : selectedAgent.name}
-                </Text>
-                <TouchableOpacity onPress={() => setSelectedAgent(defaultAgent)} activeOpacity={0.7}>
-                  <X size={14} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
           <View style={[
             styles.inputBar,
             {
@@ -840,13 +865,6 @@ export function ChatScreen() {
             },
           ]}>
             <TouchableOpacity
-              style={[styles.inputBarIconBtn, { backgroundColor: colors.surfaceSecondary }]}
-              onPress={() => setShowAgents(true)}
-              activeOpacity={0.6}
-            >
-              <Plus size={18} color={colors.text} strokeWidth={2} />
-            </TouchableOpacity>
-            <TouchableOpacity
               style={styles.inputBarIconBtn}
               onPress={pickPDF}
               disabled={uploadingPDF}
@@ -859,11 +877,11 @@ export function ChatScreen() {
               value={inputText}
               onChangeText={setInputText}
               placeholder={
-                selectedAgent.id === 'web'
+                effectiveAgentDef.id === 'web'
                   ? 'Search the web...'
-                  : selectedAgent.id === 'brain'
+                  : effectiveAgentDef.id === 'brain'
                     ? 'Ask for deep research...'
-                    : 'Message GenZ AI...'
+                    : `Message ${effectiveAgentDef.name}...`
               }
               placeholderTextColor={colors.textSecondary}
               multiline
@@ -897,7 +915,6 @@ export function ChatScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      <AgentPopup visible={showAgents} onClose={() => setShowAgents(false)} onSelect={(agent) => setSelectedAgent(agent)} />
     </View>
   );
 }
@@ -915,9 +932,6 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 17, fontWeight: '600' },
   listContent: { paddingHorizontal: Spacing.md, paddingTop: Spacing.md, paddingBottom: Spacing.sm },
   inputBarOuter: { paddingHorizontal: Spacing.md, paddingTop: Spacing.md },
-  agentBadgeRow: { marginBottom: 8, gap: 4 },
-  agentBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
-  agentBadgeText: { fontSize: 13, fontWeight: '600' },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -981,11 +995,27 @@ const msgStyles = StyleSheet.create({
   attachmentNameInMsg: { fontSize: 13 },
   thinkingRow: { flexDirection: 'row', gap: 4, paddingVertical: 8 },
   thinkingDot: { width: 8, height: 8, borderRadius: 4 },
+  webResultsSection: {
+    marginTop: 14,
+    paddingTop: 12,
+    gap: 12,
+  },
+  webResultsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  webResultsTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
   sourceActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginTop: 10,
     flexWrap: 'wrap',
   },
   sourcesBtn: {
@@ -1022,16 +1052,3 @@ const emptyStyles = StyleSheet.create({
   chipText: { fontSize: 15, fontWeight: '500', flex: 1 },
 });
 
-const popupStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.xl },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontSize: 18, fontWeight: '700' },
-  subtitle: { fontSize: 13, marginTop: 4, marginBottom: 20 },
-  list: { gap: 4 },
-  agentRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12 },
-  agentIconBox: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  agentInfo: { flex: 1, gap: 2 },
-  agentName: { fontSize: 15, fontWeight: '600' },
-  agentDesc: { fontSize: 13 },
-});

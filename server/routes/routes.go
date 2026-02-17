@@ -50,6 +50,13 @@ func Setup(router *gin.Engine, cfg *config.Config) {
 		protected.GET("/chats/:id/messages", handlers.GetChatMessages)
 		protected.DELETE("/chats/:id", handlers.DeleteChat)
 
+		// Custom agents
+		protected.POST("/agents", handlers.CreateAgent)
+		protected.GET("/agents", handlers.ListAgents)
+		protected.GET("/agents/:id", handlers.GetAgent)
+		protected.PUT("/agents/:id", handlers.UpdateAgent)
+		protected.DELETE("/agents/:id", handlers.DeleteAgent)
+
 		// Profile
 		protected.GET("/profile", handlers.GetProfile)
 		protected.GET("/profile/:id", handlers.GetProfileByID)
