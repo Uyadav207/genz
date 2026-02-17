@@ -6,6 +6,8 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -15,7 +17,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Check } from 'lucide-react-native';
+import { ArrowLeft, Check, Sparkles } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { FontSize, Spacing, DEFAULT_SKILLS, AGENT_EMOJI_OPTIONS, EMOJI_ICON_PREFIX } from '@/constants';
@@ -39,6 +41,9 @@ export function CreateAgentScreen() {
   const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
   const [selectedSkillIds, setSelectedSkillIds] = useState<Set<string>>(new Set(['web_search', 'memory']));
   const [saving, setSaving] = useState(false);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generateDescription, setGenerateDescription] = useState('');
+  const [generating, setGenerating] = useState(false);
 
   const toggleSkill = (id: string) => {
     setSelectedSkillIds((prev) => {
@@ -47,6 +52,24 @@ export function CreateAgentScreen() {
       else next.add(id);
       return next;
     });
+  };
+
+  const handleGeneratePrompt = async () => {
+    const desc = generateDescription.trim();
+    if (!desc || !accessToken || generating) return;
+    setGenerating(true);
+    try {
+      const { prompt } = await api.generateAgentPrompt(desc, accessToken);
+      if (prompt) {
+        setInstruction(prompt);
+        setShowGenerateModal(false);
+        setGenerateDescription('');
+      }
+    } catch {
+      Alert.alert('Error', 'Could not generate prompt. Please try again.');
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleSave = async () => {
@@ -160,6 +183,14 @@ export function CreateAgentScreen() {
           <Text style={[styles.hint, { color: colors.textSecondary }]}>
             Describe how the agent should behave (tone, style, constraints).
           </Text>
+          <TouchableOpacity
+            style={[styles.generatePromptBtn, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}
+            onPress={() => setShowGenerateModal(true)}
+            activeOpacity={0.7}
+          >
+            <Sparkles size={16} color={colors.primary} />
+            <Text style={[styles.generatePromptLabel, { color: colors.primary }]}>Generate world-class prompt with AI</Text>
+          </TouchableOpacity>
           <TextInput
             style={[styles.input, styles.inputMultiline, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceSecondary }]}
             placeholder="e.g. Always cite sources. Prefer concise answers. Never make up facts."
@@ -203,6 +234,47 @@ export function CreateAgentScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <Modal visible={showGenerateModal} transparent animationType="slide" onRequestClose={() => setShowGenerateModal(false)}>
+        <Pressable style={modalStyles.overlay} onPress={() => setShowGenerateModal(false)}>
+          <Pressable style={[modalStyles.sheet, { backgroundColor: colors.background }]} onPress={(e) => e.stopPropagation()}>
+            <View style={[modalStyles.header, { borderBottomColor: colors.border }]}>
+              <TouchableOpacity onPress={() => setShowGenerateModal(false)} activeOpacity={0.7}>
+                <Text style={[modalStyles.cancelText, { color: colors.textSecondary }]}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={[modalStyles.title, { color: colors.text }]}>Generate world-class prompt</Text>
+              <TouchableOpacity
+                onPress={handleGeneratePrompt}
+                activeOpacity={0.7}
+                disabled={!generateDescription.trim() || generating}
+                style={(!generateDescription.trim() || generating) && { opacity: 0.5 }}
+              >
+                {generating ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Text style={[modalStyles.primaryAction, { color: colors.primary }]}>Generate</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+            <View style={modalStyles.fields}>
+              <Text style={[modalStyles.fieldLabel, { color: colors.textSecondary }]}>
+                What should your agent do? Describe tone, tasks, and constraints. We'll use prompt engineering to create instructions optimized for LLMs.
+              </Text>
+              <TextInput
+                style={[modalStyles.fieldInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceSecondary }]}
+                placeholder="e.g. Friendly coding assistant that explains briefly, always suggests tests, never makes up API names"
+                placeholderTextColor={colors.textSecondary}
+                value={generateDescription}
+                onChangeText={setGenerateDescription}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                editable={!generating}
+              />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -256,4 +328,50 @@ const styles = StyleSheet.create({
   skillText: { flex: 1, gap: 2 },
   skillLabel: { fontSize: 15, fontWeight: '600' },
   skillDesc: { fontSize: 12 },
+  generatePromptBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  generatePromptLabel: { fontSize: 14, fontWeight: '600' },
+});
+
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  cancelText: { fontSize: 16 },
+  title: { fontSize: 17, fontWeight: '600' },
+  primaryAction: { fontSize: 16, fontWeight: '600' },
+  fields: { padding: Spacing.md, gap: 8 },
+  fieldLabel: { fontSize: 13 },
+  fieldInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    minHeight: 100,
+  },
 });

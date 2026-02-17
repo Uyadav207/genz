@@ -50,6 +50,9 @@ func Setup(router *gin.Engine, cfg *config.Config) {
 		protected.GET("/chats/:id/messages", handlers.GetChatMessages)
 		protected.DELETE("/chats/:id", handlers.DeleteChat)
 
+		// Generate agent prompt (LLM-powered behaviour/instructions from user description)
+		protected.POST("/prompts/generate", handlers.GenerateAgentPrompt(cfg))
+
 		// Custom agents
 		protected.POST("/agents", handlers.CreateAgent)
 		protected.GET("/agents", handlers.ListAgents)

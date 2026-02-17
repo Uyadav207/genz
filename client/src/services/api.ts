@@ -363,6 +363,15 @@ export const api = {
       { method: 'GET', headers: authHeaders(token) }
     ),
 
+  /** Generate a world-class agent prompt from a short description (prompt engineering via LLM). */
+  generateAgentPrompt: (description: string, token: string) =>
+    request<{ prompt: string }>('/prompts/generate', {
+      method: 'POST',
+      body: { description },
+      headers: authHeaders(token),
+      timeout: 35_000,
+    }),
+
   /** Custom agents CRUD */
   createAgent: (payload: { name: string; description?: string; instruction?: string; icon_name?: string; skill_ids?: string[] }, token: string) =>
     request<{ agent: AgentItem }>('/agents', {
