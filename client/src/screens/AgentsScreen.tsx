@@ -49,7 +49,7 @@ function AgentIconOrEmoji({ iconName, size = 24 }: { iconName: string; size?: nu
   return <AgentIcon name={iconName} size={size} />;
 }
 
-type AgentItem = AgentDef | { id: string; name: string; description: string; iconName: string };
+type AgentItem = AgentDef | { id: string; name: string; description: string; iconName: string; skillIds?: string[] };
 
 function AgentRow({
   item,
@@ -122,6 +122,7 @@ export function AgentsScreen() {
           name: a.name,
           description: a.description || '',
           iconName: a.icon_name || 'bot',
+          skillIds: a.skill_ids || [],
         }))
       );
     } catch {
@@ -143,7 +144,8 @@ export function AgentsScreen() {
   const handleAgentPress = (item: AgentItem) => {
     const tabNav = navigation.getParent() as { navigate: (name: keyof MainTabsParamList, params?: object) => void } | undefined;
     // Always open a new chat when selecting an agent (no chatId)
-    tabNav?.navigate('Chat', { chatId: undefined, agentId: item.id, agentName: item.name, agentIconName: item.iconName });
+    const skillIds = 'skillIds' in item ? (item as { skillIds?: string[] }).skillIds : undefined;
+    tabNav?.navigate('Chat', { chatId: undefined, agentId: item.id, agentName: item.name, agentIconName: item.iconName, agentSkillIds: skillIds });
   };
 
   const sections: { title: string; data: AgentItem[] }[] = [
@@ -151,7 +153,7 @@ export function AgentsScreen() {
     { title: 'Default agents', data: DEFAULT_AGENTS },
   ];
 
-  const renderSectionHeader = ({ section }: { section: { title: string } }) => (
+  const renderSectionHeader = ({ section }: any) => (
     <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{section.title}</Text>
   );
 
@@ -182,19 +184,19 @@ export function AgentsScreen() {
     );
   };
 
-  const renderAgent = ({
-    item,
-    section,
-  }: SectionListRenderItemInfo<AgentItem> & { section: { title: string; data: AgentItem[] } }) => (
-    <AgentRow
-      item={item}
-      colors={colors}
-      onPress={() => handleAgentPress(item)}
-      isCustom={section.title === 'Custom agents'}
-      onEdit={section.title === 'Custom agents' ? () => handleEditAgent(item.id) : undefined}
-      onDelete={section.title === 'Custom agents' ? () => handleDeleteAgent(item) : undefined}
-    />
-  );
+  const renderAgent = (info: any) => {
+    const { item, section } = info;
+    return (
+      <AgentRow
+        item={item}
+        colors={colors}
+        onPress={() => handleAgentPress(item)}
+        isCustom={section.title === 'Custom agents'}
+        onEdit={section.title === 'Custom agents' ? () => handleEditAgent(item.id) : undefined}
+        onDelete={section.title === 'Custom agents' ? () => handleDeleteAgent(item) : undefined}
+      />
+    );
+  };
 
   const renderListFooter = () => <View style={{ height: insets.bottom + Spacing.lg }} />;
 
@@ -227,23 +229,23 @@ export function AgentsScreen() {
         {loading ? (
           <ActivityIndicator size="small" color={colors.textSecondary} style={{ padding: Spacing.lg }} />
         ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(a) => a.id}
-          renderItem={renderAgent}
-          renderSectionHeader={renderSectionHeader}
-          stickySectionHeadersEnabled={false}
-          contentContainerStyle={styles.listContent}
-          ListFooterComponent={renderListFooter}
-          showsVerticalScrollIndicator={false}
-          renderSectionFooter={({ section }) =>
-            section.data.length === 0 && section.title === 'Custom agents' ? (
-              <Text style={[styles.emptySection, { color: colors.textSecondary }]}>
-                No custom agents yet. Create one above.
-              </Text>
-            ) : null
-          }
-        />
+          <SectionList
+            sections={sections}
+            keyExtractor={(a) => a.id}
+            renderItem={renderAgent}
+            renderSectionHeader={renderSectionHeader}
+            stickySectionHeadersEnabled={false}
+            contentContainerStyle={styles.listContent}
+            ListFooterComponent={renderListFooter}
+            showsVerticalScrollIndicator={false}
+            renderSectionFooter={({ section }) =>
+              section.data.length === 0 && section.title === 'Custom agents' ? (
+                <Text style={[styles.emptySection, { color: colors.textSecondary }]}>
+                  No custom agents yet. Create one above.
+                </Text>
+              ) : null
+            }
+          />
         )}
       </View>
     </ScreenWrapper>

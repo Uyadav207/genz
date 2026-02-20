@@ -154,9 +154,8 @@ type ConnectOptions struct {
 // systemInstruction is the agent's system prompt.
 // model is the Live API model ID (e.g. models/gemini-2.5-flash-native-audio-preview-12-2025); if empty, defaultLiveModel is used.
 // apiVersion is "v1beta" or "v1alpha"; if empty, "v1beta" is used.
-// voiceName is ignored; raw Live WebSocket schema does not support speechConfig.
 // opts is optional; if provided, the first element's Tools are included in the setup for function calling.
-func Connect(apiKey, systemInstruction, voiceName, model, apiVersion string, opts ...ConnectOptions) (*Client, error) {
+func Connect(apiKey, systemInstruction, model, apiVersion string, opts ...ConnectOptions) (*Client, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("voice: API key required")
 	}
@@ -172,21 +171,15 @@ func Connect(apiKey, systemInstruction, voiceName, model, apiVersion string, opt
 	if err != nil {
 		return nil, fmt.Errorf("voice: dial: %w", err)
 	}
-	// Setup: response is AUDIO (Linear PCM, 24kHz) with input+output transcription.
-	// Explicitly set output audio config so Gemini returns standard 24kHz/16-bit PCM.
+	// Setup: response is AUDIO with input+output transcription.
+	// No speechConfig - let model use default voice (raw Live WebSocket schema does not support speechConfig).
 	setupInner := map[string]interface{}{
 		"model": model,
 		"generationConfig": map[string]interface{}{
 			"responseModalities": []string{"AUDIO"},
-			"speechConfig": map[string]interface{}{
-				"voiceConfig": map[string]interface{}{
-					"prebuiltVoiceConfig": map[string]interface{}{
-						"voiceName": voiceName,
-					},
-				},
-			},
 		},
 		"systemInstruction": map[string]interface{}{
+			"role":  "system",
 			"parts": []map[string]interface{}{{"text": systemInstruction}},
 		},
 		"inputAudioTranscription":  map[string]interface{}{},

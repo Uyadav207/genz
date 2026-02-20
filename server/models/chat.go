@@ -23,10 +23,11 @@ type ResearchMeta struct {
 // MessageExtra holds optional rich data attached to a message (e.g. web search sources, places, images).
 // Stored in messages.extra as JSONB; same shape as WebSearchResult sans answer.
 type MessageExtra struct {
-	Sources      []MessageSource `json:"sources,omitempty"`
-	Places       []MessagePlace  `json:"places,omitempty"`
-	Images       []MessageImage  `json:"images,omitempty"`
-	ResearchMeta *ResearchMeta   `json:"research_meta,omitempty"`
+	Sources         []MessageSource  `json:"sources,omitempty"`
+	Places          []MessagePlace   `json:"places,omitempty"`
+	Images          []MessageImage   `json:"images,omitempty"`
+	GeneratedImages []GeneratedImage `json:"generated_images,omitempty"`
+	ResearchMeta    *ResearchMeta    `json:"research_meta,omitempty"`
 }
 
 // MessageSource is one organic search result (same JSON shape as internal/models.OrganicResult).
@@ -59,12 +60,18 @@ type MessageImage struct {
 	Link     string `json:"link"`
 }
 
+// GeneratedImage is an AI-generated image (from Imagen API).
+type GeneratedImage struct {
+	Title    string `json:"title"`
+	ImageURL string `json:"imageUrl"`
+}
+
 // Message is a single user or assistant message in a chat.
 type Message struct {
-	ID        string       `json:"id"`
-	ChatID    string       `json:"chat_id"`
-	Role      string       `json:"role"` // "user" or "assistant"
-	Content   string       `json:"content"`
+	ID        string        `json:"id"`
+	ChatID    string        `json:"chat_id"`
+	Role      string        `json:"role"` // "user" or "assistant"
+	Content   string        `json:"content"`
 	Extra     *MessageExtra `json:"extra,omitempty"`
-	CreatedAt time.Time    `json:"created_at"`
+	CreatedAt time.Time     `json:"created_at"`
 }

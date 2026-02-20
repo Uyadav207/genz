@@ -12,7 +12,7 @@ import (
 // GenerateWithToolsRequest holds system instruction, conversation contents, and tools.
 type GenerateWithToolsRequest struct {
 	SystemInstruction string
-	Contents          []ToolChatMessage // conversation history: role "user" or "model", content is text
+	Contents          []ToolChatMessage        // conversation history: role "user" or "model", content is text
 	Tools             []map[string]interface{} // Gemini function declarations
 	MaxOutputTokens   int
 }
@@ -127,7 +127,7 @@ func (c *GeminiClient) GenerateWithTools(ctx context.Context, req GenerateWithTo
 				})
 			}
 			contents = append(contents, map[string]interface{}{
-				"role": "model",
+				"role":  "model",
 				"parts": modelParts,
 			})
 
@@ -139,7 +139,7 @@ func (c *GeminiClient) GenerateWithTools(ctx context.Context, req GenerateWithTo
 				if err != nil {
 					result = map[string]interface{}{"error": err.Error()}
 				}
-				// Merge extra fields (sources, places, images) from web_search
+				// Merge extra fields (sources, places, images, generated_images) from tool results
 				if src, ok := result["sources"]; ok {
 					extra["sources"] = src
 				}
@@ -149,6 +149,9 @@ func (c *GeminiClient) GenerateWithTools(ctx context.Context, req GenerateWithTo
 				if im, ok := result["images"]; ok {
 					extra["images"] = im
 				}
+				if gi, ok := result["generated_images"]; ok {
+					extra["generated_images"] = gi
+				}
 				userParts = append(userParts, map[string]interface{}{
 					"functionResponse": map[string]interface{}{
 						"name":     fc.Name,
@@ -157,7 +160,7 @@ func (c *GeminiClient) GenerateWithTools(ctx context.Context, req GenerateWithTo
 				})
 			}
 			contents = append(contents, map[string]interface{}{
-				"role": "user",
+				"role":  "user",
 				"parts": userParts,
 			})
 			continue
@@ -178,8 +181,8 @@ func buildToolsRequest(systemInstruction string, contents []map[string]interface
 	body := map[string]interface{}{
 		"contents": contents,
 		"generationConfig": map[string]interface{}{
-			"temperature":      0.7,
-			"maxOutputTokens":  2048,
+			"temperature":     0.7,
+			"maxOutputTokens": 2048,
 		},
 	}
 	if maxTokens > 0 {
@@ -187,7 +190,7 @@ func buildToolsRequest(systemInstruction string, contents []map[string]interface
 	}
 	if systemInstruction != "" {
 		body["systemInstruction"] = map[string]interface{}{
-			"role": "system",
+			"role":  "system",
 			"parts": []map[string]interface{}{{"text": systemInstruction}},
 		}
 	}

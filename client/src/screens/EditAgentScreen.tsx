@@ -2,7 +2,7 @@
  * Edit Agent screen — update name, behaviour, skills.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,12 +17,13 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Check, Sparkles } from 'lucide-react-native';
+import { ArrowLeft, Check, Sparkles, Plus, Trash2, FileText } from 'lucide-react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import { FontSize, Spacing, DEFAULT_SKILLS, AGENT_EMOJI_OPTIONS, EMOJI_ICON_PREFIX } from '@/constants';
-import { api } from '@/services/api';
+import { api, type KnowledgeDoc } from '@/services/api';
+import * as DocumentPicker from 'expo-document-picker';
 import { useTheme, useAuth } from '@/contexts';
 import type { AgentsStackParamList } from '@/types';
 
@@ -49,6 +50,8 @@ export function EditAgentScreen() {
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [generateDescription, setGenerateDescription] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [kbDocs, setKbDocs] = useState<KnowledgeDoc[]>([]);
+  const [uploadingKB, setUploadingKB] = useState(false);
 
   const loadAgent = useCallback(async () => {
     if (!accessToken || !agentId) {
@@ -79,6 +82,62 @@ export function EditAgentScreen() {
       loadAgent();
     }, [loadAgent])
   );
+
+  // Load knowledge base docs when knowledge_base skill is enabled
+  const loadKBDocs = useCallback(async () => {
+    if (!accessToken || !agentId || !selectedSkillIds.has('knowledge_base')) {
+      setKbDocs([]);
+      return;
+    }
+    try {
+      const { documents } = await api.listKnowledge(agentId, accessToken);
+      setKbDocs(documents ?? []);
+    } catch {
+      setKbDocs([]);
+    }
+  }, [accessToken, agentId, selectedSkillIds]);
+
+  useEffect(() => {
+    if (!loading) loadKBDocs();
+  }, [loading, loadKBDocs]);
+
+  const handleUploadKBDoc = async () => {
+    if (!accessToken || uploadingKB || !agentId) return;
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const { uri, name } = result.assets[0];
+      setUploadingKB(true);
+      await api.uploadKnowledge(agentId, uri, name, accessToken);
+      loadKBDocs();
+    } catch {
+      Alert.alert('Error', 'Failed to upload document.');
+    } finally {
+      setUploadingKB(false);
+    }
+  };
+
+  const handleDeleteKBDoc = (doc: KnowledgeDoc) => {
+    if (!accessToken || !agentId) return;
+    Alert.alert('Delete document', `Remove "${doc.file_name}" from knowledge base?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.deleteKnowledge(agentId, doc.id, accessToken);
+            loadKBDocs();
+          } catch {
+            Alert.alert('Error', 'Failed to delete document.');
+          }
+        },
+      },
+    ]);
+  };
 
   const toggleSkill = (id: string) => {
     setSelectedSkillIds((prev) => {
@@ -266,6 +325,61 @@ export function EditAgentScreen() {
             })}
           </View>
         </View>
+
+        {/* Knowledge Base management — only shown when knowledge_base skill is enabled */}
+        {selectedSkillIds.has('knowledge_base') && (
+          <View style={styles.section}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Knowledge Base</Text>
+            <Text style={[styles.hint, { color: colors.textSecondary }]}>
+              Upload PDF documents to give your agent permanent knowledge.
+            </Text>
+            <TouchableOpacity
+              style={[styles.generatePromptBtn, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}
+              onPress={handleUploadKBDoc}
+              disabled={uploadingKB}
+              activeOpacity={0.7}
+            >
+              {uploadingKB ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Plus size={16} color={colors.primary} />
+              )}
+              <Text style={[styles.generatePromptLabel, { color: colors.primary }]}>
+                {uploadingKB ? 'Uploading...' : 'Add document'}
+              </Text>
+            </TouchableOpacity>
+            {kbDocs.length > 0 && (
+              <View style={styles.skillsList}>
+                {kbDocs.map((doc) => (
+                  <View
+                    key={doc.id}
+                    style={[styles.skillRow, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
+                  >
+                    <FileText size={18} color={colors.primary} />
+                    <View style={[styles.skillText, { marginLeft: 4 }]}>
+                      <Text style={[styles.skillLabel, { color: colors.text }]} numberOfLines={1}>
+                        {doc.file_name}
+                      </Text>
+                      <Text style={[styles.skillDesc, { color: colors.textSecondary }]}>
+                        {doc.status === 'processing' ? '⏳ Processing...' :
+                          doc.status === 'failed' ? `❌ ${doc.error_msg || 'Failed'}` :
+                            `${doc.chunk_count ?? 0} chunks • Ready`
+                        }
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteKBDoc(doc)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      activeOpacity={0.7}
+                    >
+                      <Trash2 size={18} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
       </ScrollView>
 
       <Modal visible={showGenerateModal} transparent animationType="slide" onRequestClose={() => setShowGenerateModal(false)}>

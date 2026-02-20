@@ -1,10 +1,10 @@
 package routes
 
 import (
-	"github.com/gin-gonic/gin"
 	"github.com/genz/server/config"
 	"github.com/genz/server/handlers"
 	"github.com/genz/server/middleware"
+	"github.com/gin-gonic/gin"
 )
 
 // Setup configures all API routes on the given Gin engine.
@@ -62,6 +62,11 @@ func Setup(router *gin.Engine, cfg *config.Config) {
 		protected.GET("/agents/:id", handlers.GetAgent)
 		protected.PUT("/agents/:id", handlers.UpdateAgent)
 		protected.DELETE("/agents/:id", handlers.DeleteAgent)
+
+		// Agent knowledge base (RAG)
+		protected.POST("/agents/:id/knowledge", handlers.UploadKnowledge(cfg))
+		protected.GET("/agents/:id/knowledge", handlers.ListKnowledge)
+		protected.DELETE("/agents/:id/knowledge/:doc_id", handlers.DeleteKnowledge)
 
 		// Profile
 		protected.GET("/profile", handlers.GetProfile)

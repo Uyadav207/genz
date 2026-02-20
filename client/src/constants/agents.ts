@@ -58,4 +58,6 @@ export const AGENT_EMOJI_OPTIONS = [
 export const DEFAULT_SKILLS = [
   { id: 'web_search', label: 'Web Search', description: 'Search the internet for up-to-date information' },
   { id: 'memory', label: 'Memory', description: 'Remember context across conversations' },
+  { id: 'knowledge_base', label: 'Knowledge Base', description: 'Upload documents to give your agent permanent knowledge (RAG)' },
+  { id: 'image_generation', label: 'Image Generation', description: 'Generate images from text descriptions using AI' },
 ] as const;

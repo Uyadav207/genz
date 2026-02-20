@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	Client      *supa.Client
-	AdminClient *supa.Client
+	Client          *supa.Client
+	AdminClient     *supa.Client
+	adminServiceKey string
 )
 
 // Init creates the Supabase clients used for database (PostgREST) operations.
@@ -23,9 +24,11 @@ func Init(cfg *config.Config) {
 	if AdminClient == nil {
 		log.Fatal("Failed to initialize Supabase admin client")
 	}
+	adminServiceKey = cfg.SupabaseSecret
 
 	log.Println("Supabase clients initialized successfully")
 }
 
 func GetClient() *supa.Client      { return Client }
 func GetAdminClient() *supa.Client { return AdminClient }
+func GetAdminServiceKey() string   { return adminServiceKey }

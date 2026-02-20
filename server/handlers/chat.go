@@ -21,6 +21,8 @@ import (
 	"github.com/genz/server/internal/clients"
 	"github.com/genz/server/internal/repositories"
 	"github.com/genz/server/internal/skills"
+	"github.com/genz/server/internal/skills/imagen"
+	"github.com/genz/server/internal/skills/knowledge"
 	"github.com/genz/server/models"
 	"github.com/genz/server/services"
 	"github.com/gin-gonic/gin"
@@ -222,6 +224,30 @@ func ChatComplete(cfg *config.Config) gin.HandlerFunc {
 			}
 		}
 
+		// Knowledge Base injection: auto-inject relevant chunks for KB-enabled agents
+		if slices.Contains(skillIDs, "knowledge_base") && agentID != "" {
+			kbEmbedder := knowledge.NewEmbedder(cfg.GeminiAPIKey)
+			kbRetriever := knowledge.NewRetriever(kbEmbedder)
+			// Use the last user message for retrieval
+			lastUserMsg := ""
+			for i := len(req.Messages) - 1; i >= 0; i-- {
+				if req.Messages[i].Role == "user" {
+					lastUserMsg = req.Messages[i].Content
+					break
+				}
+			}
+			if lastUserMsg != "" {
+				kbContext, kbErr := kbRetriever.Retrieve(c.Request.Context(), agentID, lastUserMsg)
+				if kbErr != nil {
+					log.Printf("[CHAT] KB retrieval error (non-fatal): %v", kbErr)
+				}
+				if kbContext != "" {
+					systemInstruction += "\n\nKNOWLEDGE BASE CONTEXT (from user's uploaded documents):\n" + kbContext
+					log.Printf("[CHAT] Injected KB context: %d chars for agent %s", len(kbContext), agentID)
+				}
+			}
+		}
+
 		// LLM tool-calling flow: agents with skills use native function calling
 		tools := skillDefs.GetToolsForSkillIDs(skillIDs)
 		if len(tools) > 0 {
@@ -255,7 +281,7 @@ func ChatComplete(cfg *config.Config) gin.HandlerFunc {
 				toolContents = append(toolContents, clients.ToolChatMessage{Role: m.Role, Content: m.Content})
 			}
 
-			toolExecutor := buildToolExecutor(webSearchSvc, systemInstruction)
+			toolExecutor := buildToolExecutor(webSearchSvc, systemInstruction, cfg)
 			result, err := geminiClient.GenerateWithTools(c.Request.Context(), clients.GenerateWithToolsRequest{
 				SystemInstruction: fullSystemPrompt,
 				Contents:          toolContents,
@@ -296,6 +322,9 @@ func ChatComplete(cfg *config.Config) gin.HandlerFunc {
 					}
 					if i, ok := extra["images"]; ok {
 						contentPayload["images"] = i
+					}
+					if gi, ok := extra["generated_images"]; ok {
+						contentPayload["generated_images"] = gi
 					}
 				}
 				fmt.Fprintf(writer, "data: %s\n\n", jsonMustMarshal(contentPayload))
@@ -524,8 +553,8 @@ func ChatComplete(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
-// buildToolExecutor returns a ToolExecutor that executes skills (web_search, memory).
-func buildToolExecutor(webSearchSvc *services.WebSearchService, systemPrompt string) clients.ToolExecutor {
+// buildToolExecutor returns a ToolExecutor that executes skills (web_search, memory, image_generation).
+func buildToolExecutor(webSearchSvc *services.WebSearchService, systemPrompt string, cfg *config.Config) clients.ToolExecutor {
 	return func(ctx context.Context, name string, args map[string]interface{}) (map[string]interface{}, error) {
 		switch name {
 		case "web_search":
@@ -551,6 +580,24 @@ func buildToolExecutor(webSearchSvc *services.WebSearchService, systemPrompt str
 				res["images"] = result.Images
 			}
 			return res, nil
+		case "image_generation":
+			prompt, _ := args["prompt"].(string)
+			if prompt == "" {
+				return map[string]interface{}{"error": "prompt is required"}, nil
+			}
+			aspectRatio, _ := args["aspect_ratio"].(string)
+			generated, err := imagen.GenerateAndUpload(ctx, cfg.GeminiAPIKey, cfg.SupabaseURL, cfg.SupabaseSecret, prompt, aspectRatio)
+			if err != nil {
+				log.Printf("[CHAT] image_generation error: %v", err)
+				return map[string]interface{}{"error": err.Error()}, nil
+			}
+			return map[string]interface{}{
+				"status":  "success",
+				"message": "Image generated successfully.",
+				"generated_images": []map[string]interface{}{
+					{"title": generated.Title, "imageUrl": generated.ImageURL},
+				},
+			}, nil
 		case "memory":
 			return map[string]interface{}{"message": "Memory feature is coming soon."}, nil
 		default:

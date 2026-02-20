@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/genz/server/internal/agents"
 	"github.com/genz/server/internal/repositories"
 	"github.com/genz/server/internal/skills"
+	"github.com/genz/server/internal/skills/knowledge"
 	"github.com/genz/server/internal/voice"
 	"github.com/genz/server/models"
 	"github.com/genz/server/services"
@@ -104,6 +106,19 @@ func VoiceStream(cfg *config.Config) gin.HandlerFunc {
 			log.Printf("[VOICE] Agent %q has %d tool(s) registered for voice session", agentID, len(tools))
 		}
 
+		// Knowledge Base injection for voice: pre-load all KB content into system prompt
+		if slices.Contains(skillIDs, "knowledge_base") && agentID != "" {
+			kbContext, kbErr := knowledge.PreloadContext(agentID)
+			if kbErr != nil {
+				log.Printf("[VOICE] KB preload error (non-fatal): %v", kbErr)
+			}
+			if kbContext != "" {
+				systemInstruction += "\n\nKNOWLEDGE BASE CONTEXT (from user's uploaded documents — use this to answer questions):\n" + kbContext
+				systemInstruction += "\nWhen answering questions about topics covered in the knowledge base above, prioritize that information. Cite the source when relevant. Keep voice answers concise but accurate."
+				log.Printf("[VOICE] Injected KB context: %d chars for agent %s", len(kbContext), agentID)
+			}
+		}
+
 		chatID, isNewChat, err := ensureVoiceChat(userID, chatIDParam, agentID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "database_error", "message": err.Error()})
@@ -124,7 +139,7 @@ func VoiceStream(cfg *config.Config) gin.HandlerFunc {
 
 		// Connect to Gemini Live with optional tool declarations
 		connectOpts := voice.ConnectOptions{Tools: tools}
-		liveClient, err := voice.Connect(cfg.GeminiAPIKey, systemInstruction, "Zephyr", cfg.GeminiVoiceModel, cfg.GeminiLiveAPIVersion, connectOpts)
+		liveClient, err := voice.Connect(cfg.GeminiAPIKey, systemInstruction, cfg.GeminiVoiceModel, cfg.GeminiLiveAPIVersion, connectOpts)
 		if err != nil {
 			log.Printf("[VOICE] Live connect error: %v", err)
 			_ = conn.WriteJSON(gin.H{"type": "error", "message": "Failed to connect to voice service"})

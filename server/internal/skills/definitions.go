@@ -104,6 +104,57 @@ func (r *DefinitionsRegistry) registerPredefined() {
 - Do not use memory for general chat or when no persistence is needed.`,
 		StateBehavior: "When using memory, acknowledge stored or retrieved context in your response.",
 	}
+
+	// knowledge_base: RAG-based document knowledge (auto-injected, not a tool call)
+	r.defs["knowledge_base"] = &SkillDef{
+		ID: "knowledge_base",
+		Tool: FunctionDeclaration{
+			Name:        "knowledge_base",
+			Description: "This skill provides context from the user's uploaded documents. It is automatically injected and does not need to be called.",
+			Parameters:  map[string]interface{}{"type": "object", "properties": map[string]interface{}{}},
+		},
+		PromptModifier: `KNOWLEDGE BASE:
+You have access to a knowledge base of documents uploaded by the user.
+Relevant content from these documents will be included in your context automatically under "KNOWLEDGE BASE CONTEXT".
+When answering:
+- Prioritize information from the knowledge base over your general knowledge.
+- Cite the source document when referencing specific information (e.g. "According to [filename]...").
+- If the knowledge base doesn't contain relevant information for the question, answer normally using your general knowledge.
+- Do not mention that you are using a knowledge base unless the user asks about it.`,
+		StateBehavior: "When knowledge base context is provided, ground your answers in that context. Be accurate and cite sources.",
+	}
+
+	// image_generation: generate images from text prompts using Imagen
+	r.defs["image_generation"] = &SkillDef{
+		ID: "image_generation",
+		Tool: FunctionDeclaration{
+			Name:        "image_generation",
+			Description: "Generate an image from a text description. Use when the user asks to create, generate, draw, design, or make an image, picture, illustration, photo, or artwork.",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"prompt": map[string]interface{}{
+						"type":        "string",
+						"description": "A detailed description of the image to generate. Be specific about subjects, style, colors, composition, lighting, and mood.",
+					},
+					"aspect_ratio": map[string]interface{}{
+						"type":        "string",
+						"description": "The aspect ratio for the generated image. Defaults to 1:1 (square).",
+						"enum":        []interface{}{"1:1", "3:4", "4:3", "9:16", "16:9"},
+					},
+				},
+				"required": []interface{}{"prompt"},
+			},
+		},
+		PromptModifier: `TOOL: image_generation
+- Use image_generation IMMEDIATELY when the user asks to create, generate, draw, design, or make an image, picture, illustration, photo, artwork, or visual.
+- Do NOT ask the user to confirm or approve the prompt. Do NOT discuss what you will generate. Just call the tool right away.
+- Enhance the user's description into a detailed, vivid image prompt with style, composition, lighting, and mood details.
+- Choose an appropriate aspect_ratio based on the content (e.g. "9:16" for portraits, "16:9" for landscapes, "1:1" for icons/logos).
+- Do NOT use image_generation for general chat, text questions, or when no image creation is requested.
+- Generate ONE image per request unless the user explicitly asks for more.`,
+		StateBehavior: `After generating an image, briefly describe what was created in 1-2 sentences. Do not suggest modifications unless the user asks for changes.`,
+	}
 }
 
 // Get returns the skill definition by ID, or nil.
@@ -185,4 +236,3 @@ func joinStrings(ss []string, sep string) string {
 	}
 	return s
 }
-

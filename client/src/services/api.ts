@@ -92,6 +92,12 @@ export interface ImageItem {
   link?: string;
 }
 
+/** Generated image result (from Imagen API) */
+export interface GeneratedImageItem {
+  title: string;
+  imageUrl: string;
+}
+
 /** Research run metadata (partial, confidence, sub_queries). */
 export interface ResearchMeta {
   partial?: boolean;
@@ -108,6 +114,8 @@ export interface ChatResponse {
   places?: PlaceItem[];
   /** Web search images */
   images?: ImageItem[];
+  /** AI-generated images (from Imagen) */
+  generated_images?: GeneratedImageItem[];
   /** Research-only metadata (partial, confidence, sub_queries) */
   research_meta?: ResearchMeta;
 }
@@ -140,11 +148,12 @@ export interface AgentItem {
   updated_at: string;
 }
 
-/** Message extra payload (sources, places, images, research_meta). */
+/** Message extra payload (sources, places, images, generated_images, research_meta). */
 export interface MessageExtra {
   sources?: SourceItem[];
   places?: PlaceItem[];
   images?: ImageItem[];
+  generated_images?: GeneratedImageItem[];
   research_meta?: ResearchMeta;
 }
 
@@ -162,6 +171,17 @@ export interface UpdateProfilePayload {
   username?: string;
   bio?: string;
   avatar_url?: string;
+}
+
+/** Knowledge base document metadata */
+export interface KnowledgeDoc {
+  id: string;
+  file_name: string;
+  file_size?: number;
+  chunk_count?: number;
+  status: 'processing' | 'ready' | 'failed';
+  error_msg?: string;
+  created_at?: string;
 }
 
 export const api = {
@@ -392,6 +412,56 @@ export const api = {
   deleteAgent: (id: string, token: string) =>
     request<{ message: string }>(`/agents/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
 
+  /** Knowledge base: upload a document to an agent's knowledge base. */
+  uploadKnowledge: async (agentId: string, fileUri: string, fileName: string, token: string): Promise<KnowledgeDoc> => {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: fileUri,
+      name: fileName,
+      type: 'application/pdf',
+    } as unknown as Blob);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000); // 2min for large files
+
+    const response = await fetch(`${Config.API_BASE_URL}/agents/${agentId}/knowledge`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      } as Record<string, string>,
+      body: formData,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      let errorMessage = `Upload failed: ${response.status}`;
+      try {
+        const err = await response.json();
+        if (err?.message) errorMessage = err.message;
+      } catch {
+        //
+      }
+      throw new Error(errorMessage);
+    }
+    return response.json() as Promise<KnowledgeDoc>;
+  },
+
+  /** Knowledge base: list documents for an agent. */
+  listKnowledge: (agentId: string, token: string) =>
+    request<{ documents: KnowledgeDoc[] }>(`/agents/${agentId}/knowledge`, {
+      method: 'GET',
+      headers: authHeaders(token),
+    }),
+
+  /** Knowledge base: delete a document from an agent's knowledge base. */
+  deleteKnowledge: (agentId: string, docId: string, token: string) =>
+    request<{ deleted: boolean }>(`/agents/${agentId}/knowledge/${docId}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    }),
+
   /** Get messages for a chat (requires auth) */
   getChatMessages: (chatId: string, token: string) =>
     request<{ messages: ChatMessageItem[] }>(`/chats/${chatId}/messages`, { method: 'GET', headers: authHeaders(token) }),
@@ -412,7 +482,7 @@ export const api = {
     agentId?: string | null,
     pdfContext?: string,
     attachmentIds?: string[],
-    onExtra?: (extra: { sources?: SourceItem[]; places?: PlaceItem[]; images?: ImageItem[] }) => void,
+    onExtra?: (extra: { sources?: SourceItem[]; places?: PlaceItem[]; images?: ImageItem[]; generated_images?: GeneratedImageItem[] }) => void,
   ): void => {
     const url = `${Config.API_BASE_URL}/chat?stream=true`;
     const body = JSON.stringify({
@@ -452,11 +522,12 @@ export const api = {
           const parsed = JSON.parse(data);
           if (parsed.chat_id) onChatId(parsed.chat_id);
           if (parsed.content) onChunk(parsed.content);
-          if (parsed.sources || parsed.places || parsed.images) {
+          if (parsed.sources || parsed.places || parsed.images || parsed.generated_images) {
             onExtra?.({
               sources: parsed.sources,
               places: parsed.places,
               images: parsed.images,
+              generated_images: parsed.generated_images,
             });
           }
           if (parsed.error) throw new Error(parsed.error);
