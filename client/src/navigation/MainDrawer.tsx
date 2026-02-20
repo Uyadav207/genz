@@ -6,6 +6,7 @@
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { ChatScreen } from '@/screens/ChatScreen';
+import { VoiceScreen } from '@/screens/VoiceScreen';
 import { AgentsStack } from '@/navigation/AgentsStack';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { SidebarContent } from '@/components/SidebarContent';
@@ -31,6 +32,7 @@ export function MainDrawer() {
       }}
     >
       <Drawer.Screen name="Chat" component={ChatScreen} />
+      <Drawer.Screen name="Voice" component={VoiceScreen} />
       <Drawer.Screen name="Agents" component={AgentsStack} />
       <Drawer.Screen name="Settings" component={SettingsScreen} />
     </Drawer.Navigator>

@@ -37,6 +37,7 @@ import {
   FileText,
   Copy,
   BookOpen,
+  Mic,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
@@ -538,6 +539,7 @@ export function ChatScreen() {
       api.getChatMessages(routeChatId, accessToken)
         .then(({ messages: list }) => {
           setChatId(routeChatId);
+          refetchChats(accessToken, routeAgentId ?? undefined);
           setMessages(list.map((m) => ({
             id: m.id,
             role: m.role as MessageRole,
@@ -551,7 +553,7 @@ export function ChatScreen() {
         })
         .catch(() => {})
         .finally(() => setLoadingChat(false));
-    }, [routeChatId, accessToken])
+    }, [routeChatId, routeAgentId, accessToken, refetchChats])
   );
 
   const scrollToEnd = useCallback(() => { setTimeout(() => { flatListRef.current?.scrollToEnd({ animated: true }); }, 100); }, []);
@@ -812,11 +814,20 @@ export function ChatScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">
           {currentChatTitle}
         </Text>
-        {hasMessages && (
-          <TouchableOpacity style={styles.newChatBtn} activeOpacity={0.7} onPress={startNewChat}>
-            <SquarePen size={20} color={colors.text} />
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={() => navigation.navigate('Voice', { agentId: effectiveAgentId, chatId: activeChatId ?? undefined })}
+            activeOpacity={0.7}
+          >
+            <Mic size={20} color={colors.text} />
           </TouchableOpacity>
-        )}
+          {hasMessages && (
+            <TouchableOpacity style={styles.headerIconBtn} activeOpacity={0.7} onPress={startNewChat}>
+              <SquarePen size={20} color={colors.text} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
@@ -928,7 +939,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.md, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 8, position: 'relative' },
   menuBtn: { position: 'absolute', left: Spacing.md, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  newChatBtn: { position: 'absolute', right: Spacing.md, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  headerRight: { position: 'absolute', right: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  headerIconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '600' },
   listContent: { paddingHorizontal: Spacing.md, paddingTop: Spacing.md, paddingBottom: Spacing.sm },
   inputBarOuter: { paddingHorizontal: Spacing.md, paddingTop: Spacing.md },

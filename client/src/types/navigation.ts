@@ -14,6 +14,7 @@ export type NavigationParamList = {
 /** Bottom tab screens inside the authenticated shell */
 export type MainTabsParamList = {
   Chat: { chatId?: string; agentId?: string; agentName?: string; agentIconName?: string } | undefined;
+  Voice: { agentId?: string; chatId?: string } | undefined;
   Agents: undefined;
   Settings: undefined;
 };

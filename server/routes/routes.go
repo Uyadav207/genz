@@ -32,6 +32,9 @@ func Setup(router *gin.Engine, cfg *config.Config) {
 	// ── Debug: SERP API test (no auth, for curl testing) ─────
 	v1.GET("/debug/serp", handlers.SerpTest(cfg))
 
+	// ── Voice WebSocket (auth via query param token; cannot use AuthMiddleware on upgrade) ─────
+	v1.GET("/voice/stream", handlers.VoiceStream(cfg))
+
 	// ── Protected routes (require valid JWT) ─────────
 	protected := v1.Group("/")
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
