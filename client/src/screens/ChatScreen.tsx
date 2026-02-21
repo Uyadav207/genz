@@ -115,10 +115,10 @@ function truncateFileName(name: string, maxChars: number = 22): string {
 /* ------------------------------------------------------------------ */
 
 const SUGGESTIONS = [
-  { label: 'Make me a 7-day diet plan', icon: '🥗', color: '#22C55E' },
-  { label: 'Tell me a mind-blowing fact', icon: '🤯', color: '#3B82F6' },
+  { label: 'Make me a 7-day diet plan', icon: '🥗', color: '#06B6D4' },
+  { label: 'Tell me a mind-blowing fact', icon: '🤯', color: '#B57EDC' },
   { label: 'Write me a funny short story', icon: '✍️', color: '#F59E0B' },
-  { label: 'Tell me your best joke', icon: '😂', color: '#EC4899' },
+  { label: 'Tell me your best joke', icon: '😂', color: '#CDA4F0' },
 ];
 
 /** Slangy "thinking" phrases for GenZ mode typing indicator */
@@ -142,7 +142,7 @@ const GENZ_THINKING_PHRASES = [
 const EMOJI_PREFIX = 'emoji:';
 
 function AgentIcon({ name, size = 22, color: colorOverride }: { name: string; size?: number; color?: string }) {
-  const color = colorOverride ?? (AGENT_ICON_COLORS[name] || '#6C63FF');
+  const color = colorOverride ?? (AGENT_ICON_COLORS[name] || '#B57EDC');
   switch (name) {
     case 'genz': return <Sparkles size={size} color={color} />;
     case 'code': return <Code size={size} color={color} />;
@@ -1049,9 +1049,7 @@ export function ChatScreen() {
                 styles.sendBtn,
                 {
                   backgroundColor: canSend
-                    ? isDark
-                      ? colors.white
-                      : '#000000'
+                    ? colors.primary
                     : colors.surfaceSecondary,
                 },
               ]}
@@ -1061,7 +1059,7 @@ export function ChatScreen() {
             >
               <ArrowUp
                 size={18}
-                color={canSend ? (isDark ? '#000000' : colors.white) : colors.textSecondary}
+                color={canSend ? colors.white : colors.textSecondary}
                 strokeWidth={2.5}
               />
             </TouchableOpacity>

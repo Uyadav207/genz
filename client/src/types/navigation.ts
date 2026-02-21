@@ -16,6 +16,7 @@ export type MainTabsParamList = {
   Chat: { chatId?: string; agentId?: string; agentName?: string; agentIconName?: string } | undefined;
   Voice: { agentId?: string; chatId?: string } | undefined;
   Agents: undefined;
+  Marketplace: undefined;
   Settings: undefined;
 };
 
@@ -24,4 +25,12 @@ export type AgentsStackParamList = {
   AgentsList: undefined;
   CreateAgent: undefined;
   EditAgent: { agentId: string };
+};
+
+export type MarketplaceStackParamList = {
+  MarketplaceList: undefined;
+  MarketplaceDetail: { listingId: string };
+  PublishListing: { agentId: string };
+  EditListing: { listingId: string };
+  MyListings: undefined;
 };

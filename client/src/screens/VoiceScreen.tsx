@@ -520,7 +520,7 @@ export function VoiceScreen() {
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 32) }]}>
         {(isConnected || isSaving) ? (
           <TouchableOpacity
-            style={[styles.stopBtn, { backgroundColor: isDark ? '#1E1A2E' : colors.surfaceSecondary }]}
+            style={[styles.stopBtn, { backgroundColor: isDark ? '#24222E' : colors.surfaceSecondary }]}
             onPress={endConversation}
             disabled={isSaving}
             activeOpacity={0.7}

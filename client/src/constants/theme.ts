@@ -4,14 +4,14 @@
  */
 
 export const Colors = {
-  primary: '#6C63FF',
-  primaryLight: '#A5A0FF',
-  secondary: '#FF6584',
-  background: '#FFFFFF',
-  surface: '#F5F5F5',
-  text: '#1A1A2E',
-  textSecondary: '#6B7280',
-  border: '#E5E7EB',
+  primary: '#B57EDC',
+  primaryLight: '#D8B4FE',
+  secondary: '#1E1E1E',
+  background: '#FAFAFF',
+  surface: '#F0EDF5',
+  text: '#1B1528',
+  textSecondary: '#7B6F8E',
+  border: '#DDD6E8',
   error: '#EF4444',
   success: '#22C55E',
   warning: '#F59E0B',

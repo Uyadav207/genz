@@ -30,7 +30,7 @@ type StackNav = NativeStackNavigationProp<AgentsStackParamList, 'AgentsList'>;
 const EMOJI_PREFIX = 'emoji:';
 
 function AgentIcon({ name, size = 22 }: { name: string; size?: number }) {
-  const color = AGENT_ICON_COLORS[name] || '#6C63FF';
+  const color = AGENT_ICON_COLORS[name] || '#B57EDC';
   switch (name) {
     case 'genz': return <Sparkles size={size} color={color} />;
     case 'code': return <Code size={size} color={color} />;
@@ -57,6 +57,7 @@ function AgentRow({
   onPress,
   isCustom,
   onEdit,
+  onPublish,
   onDelete,
 }: {
   item: AgentItem;
@@ -64,12 +65,17 @@ function AgentRow({
   onPress: () => void;
   isCustom?: boolean;
   onEdit?: () => void;
+  onPublish?: () => void;
   onDelete?: () => void;
 }) {
   return (
-    <View style={[styles.agentRow, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
-      <TouchableOpacity style={styles.agentRowContent} onPress={onPress} activeOpacity={0.7}>
-        <View style={[styles.agentIconWrap, { backgroundColor: colors.background }]}>
+    <TouchableOpacity
+      style={[styles.agentRow, { backgroundColor: '#FFFFFF', borderColor: colors.border }]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.agentRowContent}>
+        <View style={[styles.agentIconWrap, { backgroundColor: colors.surface }]}>
           <AgentIconOrEmoji iconName={item.iconName} size={24} />
         </View>
         <View style={styles.agentText}>
@@ -78,7 +84,7 @@ function AgentRow({
             {item.description}
           </Text>
         </View>
-      </TouchableOpacity>
+      </View>
       {isCustom && (
         <TouchableOpacity
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -86,6 +92,7 @@ function AgentRow({
             Alert.alert('Agent options', item.name, [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Edit', onPress: onEdit },
+              { text: 'Publish', onPress: onPublish },
               { text: 'Delete', style: 'destructive', onPress: onDelete },
             ])
           }
@@ -95,7 +102,7 @@ function AgentRow({
           <MoreVertical size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       )}
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -161,6 +168,11 @@ export function AgentsScreen() {
     navigation.navigate('EditAgent', { agentId });
   };
 
+  const handlePublishAgent = (agentId: string) => {
+    const tabNav = navigation.getParent() as any;
+    tabNav?.navigate('Marketplace', { screen: 'PublishListing', params: { agentId } });
+  };
+
   const handleDeleteAgent = (item: AgentItem) => {
     Alert.alert(
       'Delete agent',
@@ -193,6 +205,7 @@ export function AgentsScreen() {
         onPress={() => handleAgentPress(item)}
         isCustom={section.title === 'Custom agents'}
         onEdit={section.title === 'Custom agents' ? () => handleEditAgent(item.id) : undefined}
+        onPublish={section.title === 'Custom agents' ? () => handlePublishAgent(item.id) : undefined}
         onDelete={section.title === 'Custom agents' ? () => handleDeleteAgent(item) : undefined}
       />
     );
@@ -211,7 +224,7 @@ export function AgentsScreen() {
 
       <View style={styles.content}>
         <TouchableOpacity
-          style={[styles.createCard, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
+          style={[styles.createCard, { backgroundColor: '#FFFFFF', borderColor: colors.border }]}
           onPress={() => navigation.navigate('CreateAgent')}
           activeOpacity={0.7}
         >

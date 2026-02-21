@@ -35,6 +35,10 @@ func Setup(router *gin.Engine, cfg *config.Config) {
 	// ── Voice WebSocket (auth via query param token; cannot use AuthMiddleware on upgrade) ─────
 	v1.GET("/voice/stream", handlers.VoiceStream(cfg))
 
+	// ── Marketplace Public ───────────────────────────
+	v1.GET("/marketplace/listings", handlers.ListMarketplaceListings)
+	v1.GET("/marketplace/listings/:id", handlers.GetMarketplaceListing)
+
 	// ── Protected routes (require valid JWT) ─────────
 	protected := v1.Group("/")
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
@@ -73,5 +77,13 @@ func Setup(router *gin.Engine, cfg *config.Config) {
 		protected.GET("/profile/:id", handlers.GetProfileByID)
 		protected.PUT("/profile", handlers.UpdateProfile)
 		protected.DELETE("/profile", handlers.DeleteProfile)
+
+		// Marketplace Protected
+		protected.POST("/marketplace/listings", handlers.CreateMarketplaceListing)
+		protected.PUT("/marketplace/listings/:id", handlers.UpdateMarketplaceListing)
+		protected.DELETE("/marketplace/listings/:id", handlers.DeleteMarketplaceListing)
+		// `mine` must be registered before `/:id` to avoid conflict, but Gin treats explicit `mine` as exact match if put before `/:id` or if it's static. Wait, Gin uses a Radix tree so order doesn't strictly matter for static vs param, but `/mine` is better placed carefully.
+		protected.GET("/marketplace/listings/mine", handlers.GetMyListings)
+		protected.POST("/marketplace/listings/:id/download", handlers.DownloadListing)
 	}
 }

@@ -50,18 +50,18 @@ interface Palette {
     ripple: string;  // ripple ring color
 }
 
-const DarkPalette: Palette = {
-    gradA: '#C4B5FD',   // Soft lavender center
-    gradB: '#8B5CF6',   // Vivid purple
-    gradC: '#5B21B6',   // Deep purple edge
-    ripple: '#A78BFA',  // Lavender ripple
+const DarkColors: Palette = {
+    gradA: '#D8B4FE',   // Soft lavender center
+    gradB: '#B57EDC',   // Digital lavender mid
+    gradC: '#6B21A8',   // Deep purple edge
+    ripple: '#D8B4FE',  // Soft lavender ripple
 };
 
-const LightPalette: Palette = {
-    gradA: '#DDD6FE',   // Lighter lavender center
-    gradB: '#A78BFA',   // Mid purple
-    gradC: '#7C3AED',   // Rich purple edge
-    ripple: '#8B5CF6',  // Purple ripple
+const LightColors: Palette = {
+    gradA: '#E6E6FA',   // Digital lavender center
+    gradB: '#CDA4F0',   // Mid lavender
+    gradC: '#9333EA',   // Rich purple edge
+    ripple: '#CDA4F0',  // Mid lavender ripple
 };
 
 /* ------------------------------------------------------------------ */
@@ -131,7 +131,7 @@ function Ripple({
 const ORB_SIZE = 140;
 
 export function VoiceOrb({ state, size = ORB_SIZE, isDark = true }: VoiceOrbProps) {
-    const P = isDark ? DarkPalette : LightPalette;
+    const P = isDark ? DarkColors : LightColors;
 
     const breathe = useSharedValue(0);
     const orbScale = useSharedValue(1);

@@ -12,7 +12,8 @@ import {
   type ViewStyle,
   ActivityIndicator,
 } from 'react-native';
-import { Colors, FontSize, Spacing, BorderRadius } from '@/constants';
+import { FontSize, Spacing, BorderRadius } from '@/constants';
+import { useTheme } from '@/contexts';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
 
@@ -33,6 +34,25 @@ export function Button({
   ...rest
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const { colors } = useTheme();
+
+  const variantStyles: Record<ButtonVariant, ViewStyle> = {
+    primary: { backgroundColor: colors.primary },
+    secondary: { backgroundColor: colors.secondary },
+    outline: {
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+    },
+    ghost: { backgroundColor: 'transparent' },
+  };
+
+  const variantTextStyles: Record<ButtonVariant, TextStyle> = {
+    primary: { color: colors.white },
+    secondary: { color: colors.white },
+    outline: { color: colors.primary },
+    ghost: { color: colors.primary },
+  };
 
   return (
     <TouchableOpacity
@@ -48,7 +68,7 @@ export function Button({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'outline' || variant === 'ghost' ? Colors.primary : Colors.white}
+          color={variant === 'outline' || variant === 'ghost' ? colors.primary : colors.white}
         />
       ) : (
         <Text style={[styles.text, variantTextStyles[variant], textStyle]}>{title}</Text>
@@ -75,20 +95,3 @@ const styles = StyleSheet.create({
   },
 });
 
-const variantStyles: Record<ButtonVariant, ViewStyle> = {
-  primary: { backgroundColor: Colors.primary },
-  secondary: { backgroundColor: Colors.secondary },
-  outline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-  },
-  ghost: { backgroundColor: 'transparent' },
-};
-
-const variantTextStyles: Record<ButtonVariant, TextStyle> = {
-  primary: { color: Colors.white },
-  secondary: { color: Colors.white },
-  outline: { color: Colors.primary },
-  ghost: { color: Colors.primary },
-};

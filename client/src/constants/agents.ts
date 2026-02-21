@@ -23,13 +23,13 @@ export const DEFAULT_AGENTS: AgentDef[] = [
 ];
 
 export const AGENT_ICON_COLORS: Record<string, string> = {
-  genz: '#A855F7',
-  code: '#6C63FF',
-  pen: '#F59E0B',
-  image: '#EC4899',
-  brain: '#22C55E',
-  globe: '#3B82F6',
-  bot: '#8B5CF6',
+  genz: '#B57EDC',
+  code: '#1E1E1E',
+  pen: '#F0A8D0',
+  image: '#FF8EC7',
+  brain: '#F59E0B',
+  globe: '#7DD3FC',
+  bot: '#CDA4F0',
 };
 
 /** Personalized empty-state greeting per default agent (no action cards). Custom agents use agent name + generic line. */

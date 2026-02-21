@@ -157,6 +157,13 @@ export interface MessageExtra {
   research_meta?: ResearchMeta;
 }
 
+import type {
+  MarketplaceListing,
+  CreateListingPayload,
+  UpdateListingPayload,
+  MarketplaceDownloadResponse,
+} from '@/types';
+
 export interface ChatMessageItem {
   id: string;
   chat_id: string;
@@ -561,4 +568,53 @@ export const api = {
     xhr.ontimeout = () => onError(new Error('Request timeout'));
     xhr.send(body);
   },
+
+  /** Marketplace - Public */
+  listMarketplaceListings: (token?: string, params?: { status?: string; category?: string; sort?: string }) => {
+    const qs = new URLSearchParams(params as any).toString();
+    const endpoint = qs ? `/marketplace/listings?${qs}` : '/marketplace/listings';
+    return request<{ listings: MarketplaceListing[]; total: number }>(endpoint, {
+      method: 'GET',
+      headers: token ? authHeaders(token) : {},
+    });
+  },
+
+  getMarketplaceListing: (id: string, token?: string) =>
+    request<{ listing: MarketplaceListing }>(`/marketplace/listings/${id}`, {
+      method: 'GET',
+      headers: token ? authHeaders(token) : {},
+    }),
+
+  /** Marketplace - Protected */
+  createMarketplaceListing: (payload: CreateListingPayload, token: string) =>
+    request<{ listing: MarketplaceListing }>('/marketplace/listings', {
+      method: 'POST',
+      body: payload,
+      headers: authHeaders(token),
+    }),
+
+  updateMarketplaceListing: (id: string, payload: UpdateListingPayload, token: string) =>
+    request<{ listing: MarketplaceListing }>(`/marketplace/listings/${id}`, {
+      method: 'PUT',
+      body: payload,
+      headers: authHeaders(token),
+    }),
+
+  deleteMarketplaceListing: (id: string, token: string) =>
+    request<{ message: string }>(`/marketplace/listings/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    }),
+
+  getMyListings: (token: string) =>
+    request<{ listings: MarketplaceListing[] }>('/marketplace/listings/mine', {
+      method: 'GET',
+      headers: authHeaders(token),
+    }),
+
+  downloadListing: (id: string, token: string) =>
+    request<MarketplaceDownloadResponse>(`/marketplace/listings/${id}/download`, {
+      method: 'POST',
+      headers: authHeaders(token),
+    }),
 };
