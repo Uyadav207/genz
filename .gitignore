@@ -20,3 +20,6 @@ Thumbs.db
 *.log
 *.tmp
 .temp/
+
+# Agent team (local only)
+.agents/

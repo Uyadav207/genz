@@ -4,3 +4,8 @@ export { AgentsScreen } from './AgentsScreen';
 export { SettingsScreen } from './SettingsScreen';
 export { SignInScreen } from './SignInScreen';
 export { SignUpScreen } from './SignUpScreen';
+export { MarketplaceScreen } from './MarketplaceScreen';
+export { MarketplaceDetailScreen } from './MarketplaceDetailScreen';
+export { PublishListingScreen } from './PublishListingScreen';
+export { EditMarketplaceListingScreen } from './EditMarketplaceListingScreen';
+export { MyListingsScreen } from './MyListingsScreen';

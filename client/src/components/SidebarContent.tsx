@@ -11,13 +11,12 @@ import {
   TouchableOpacity,
   View,
   ScrollView,
-  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DrawerContentScrollView, DrawerContentComponentProps } from '@react-navigation/drawer';
 import { MessageCircle, Bot, Settings, MoreVertical } from 'lucide-react-native';
 import { api } from '@/services/api';
-import { Spacing } from '@/constants';
+import { DEFAULT_AGENT_ID, Spacing, SIDEBAR_WIDTH } from '@/constants';
 import { useAuth, useChats, useTheme } from '@/contexts';
 import type { MainTabsParamList } from '@/types';
 
@@ -35,8 +34,7 @@ export function SidebarContent(props: DrawerContentComponentProps) {
   const { accessToken } = useAuth();
   const { chats, loading, refetch } = useChats();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const sidebarWidth = Math.min(260, width * 0.78);
+  const sidebarWidth = SIDEBAR_WIDTH;
 
   const currentRoute = state.routeNames[state.index] as NavRoute;
 
@@ -54,9 +52,13 @@ export function SidebarContent(props: DrawerContentComponentProps) {
   }, [navigation, accessToken, refetch]);
 
   const openChat = useCallback(
-    (chatId: string | undefined) => {
+    (chatId: string | undefined, agentId?: string) => {
       navigation.closeDrawer();
-      navigation.navigate('Chat', chatId ? { chatId } : undefined);
+      if (chatId != null) {
+        navigation.navigate('Chat', { chatId, agentId: agentId ?? DEFAULT_AGENT_ID });
+      } else {
+        navigation.navigate('Chat', { agentId: DEFAULT_AGENT_ID });
+      }
     },
     [navigation]
   );
@@ -77,7 +79,7 @@ export function SidebarContent(props: DrawerContentComponentProps) {
                 await api.deleteChat(chatId, accessToken);
                 refetch(accessToken);
                 navigation.closeDrawer();
-                navigation.navigate('Chat', undefined);
+                navigation.navigate('Chat', { agentId: DEFAULT_AGENT_ID });
               } catch {
                 Alert.alert('Error', 'Failed to delete chat. Please try again.');
               }
@@ -173,7 +175,7 @@ export function SidebarContent(props: DrawerContentComponentProps) {
               <View key={chat.id} style={styles.historyItem}>
                 <TouchableOpacity
                   style={styles.historyItemContent}
-                  onPress={() => openChat(chat.id)}
+                  onPress={() => openChat(chat.id, chat.agent_id)}
                   activeOpacity={0.6}
                 >
                   <Text style={[styles.historyItemTitle, { color: colors.text }]} numberOfLines={1}>

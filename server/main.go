@@ -3,12 +3,12 @@ package main
 import (
 	"log"
 
-	"github.com/gin-gonic/gin"
 	"github.com/genz/server/config"
 	"github.com/genz/server/database"
 	"github.com/genz/server/middleware"
 	"github.com/genz/server/routes"
 	"github.com/genz/server/utils"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -28,6 +28,7 @@ func main() {
 
 	// Create Gin router with default recovery middleware
 	router := gin.New()
+	router.MaxMultipartMemory = 32 << 20 // 32 MB for knowledge base uploads
 
 	// Apply global middleware
 	router.Use(gin.Recovery())

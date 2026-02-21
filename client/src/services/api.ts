@@ -92,6 +92,12 @@ export interface ImageItem {
   link?: string;
 }
 
+/** Generated image result (from Imagen API) */
+export interface GeneratedImageItem {
+  title: string;
+  imageUrl: string;
+}
+
 /** Research run metadata (partial, confidence, sub_queries). */
 export interface ResearchMeta {
   partial?: boolean;
@@ -108,6 +114,8 @@ export interface ChatResponse {
   places?: PlaceItem[];
   /** Web search images */
   images?: ImageItem[];
+  /** AI-generated images (from Imagen) */
+  generated_images?: GeneratedImageItem[];
   /** Research-only metadata (partial, confidence, sub_queries) */
   research_meta?: ResearchMeta;
 }
@@ -123,18 +131,38 @@ export interface PDFUploadResult {
 
 export interface ChatListItem {
   id: string;
+  agent_id?: string;
   title: string;
   created_at: string;
   updated_at: string;
 }
 
-/** Message extra payload (sources, places, images, research_meta). */
+export interface AgentItem {
+  id: string;
+  name: string;
+  description: string;
+  instruction: string;
+  icon_name: string;
+  skill_ids?: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** Message extra payload (sources, places, images, generated_images, research_meta). */
 export interface MessageExtra {
   sources?: SourceItem[];
   places?: PlaceItem[];
   images?: ImageItem[];
+  generated_images?: GeneratedImageItem[];
   research_meta?: ResearchMeta;
 }
+
+import type {
+  MarketplaceListing,
+  CreateListingPayload,
+  UpdateListingPayload,
+  MarketplaceDownloadResponse,
+} from '@/types';
 
 export interface ChatMessageItem {
   id: string;
@@ -150,6 +178,17 @@ export interface UpdateProfilePayload {
   username?: string;
   bio?: string;
   avatar_url?: string;
+}
+
+/** Knowledge base document metadata */
+export interface KnowledgeDoc {
+  id: string;
+  file_name: string;
+  file_size?: number;
+  chunk_count?: number;
+  status: 'processing' | 'ready' | 'failed';
+  error_msg?: string;
+  created_at?: string;
 }
 
 export const api = {
@@ -182,7 +221,7 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     }),
 
-  /** Chat completion (requires auth). Pass chat_id when continuing. agentId defaults to GenZ Assistant. tools triggers web search or research. pdfContext and attachmentIds for PDF attachments. */
+  /** Chat completion (requires auth). Pass chat_id when continuing. agentId defaults to GenZ Assistant. Backend decides skills from agent config. tools override for explicit research. pdfContext and attachmentIds for PDF attachments. */
   chatComplete: (
     messages: ChatMessage[],
     chatId: string | null,
@@ -344,9 +383,91 @@ export const api = {
     return response.json() as Promise<PDFUploadResult>;
   },
 
-  /** List user's chats (requires auth) */
-  getChats: (token: string) =>
-    request<{ chats: ChatListItem[] }>('/chats', { method: 'GET', headers: authHeaders(token) }),
+  /** List user's chats (requires auth). Pass agentId to filter by agent. */
+  getChats: (token: string, agentId?: string | null) =>
+    request<{ chats: ChatListItem[] }>(
+      agentId ? `/chats?agent_id=${encodeURIComponent(agentId)}` : '/chats',
+      { method: 'GET', headers: authHeaders(token) }
+    ),
+
+  /** Generate a world-class agent prompt from a short description (prompt engineering via LLM). */
+  generateAgentPrompt: (description: string, token: string) =>
+    request<{ prompt: string }>('/prompts/generate', {
+      method: 'POST',
+      body: { description },
+      headers: authHeaders(token),
+      timeout: 35_000,
+    }),
+
+  /** Custom agents CRUD */
+  createAgent: (payload: { name: string; description?: string; instruction?: string; icon_name?: string; skill_ids?: string[] }, token: string) =>
+    request<{ agent: AgentItem }>('/agents', {
+      method: 'POST',
+      body: payload,
+      headers: authHeaders(token),
+    }),
+  listAgents: (token: string) =>
+    request<{ agents: AgentItem[] }>('/agents', { method: 'GET', headers: authHeaders(token) }),
+  getAgent: (id: string, token: string) =>
+    request<{ agent: AgentItem }>(`/agents/${id}`, { method: 'GET', headers: authHeaders(token) }),
+  updateAgent: (id: string, payload: Partial<{ name: string; description: string; instruction: string; icon_name: string; skill_ids: string[] }>, token: string) =>
+    request<{ agent: AgentItem }>(`/agents/${id}`, {
+      method: 'PUT',
+      body: payload,
+      headers: authHeaders(token),
+    }),
+  deleteAgent: (id: string, token: string) =>
+    request<{ message: string }>(`/agents/${id}`, { method: 'DELETE', headers: authHeaders(token) }),
+
+  /** Knowledge base: upload a document to an agent's knowledge base. */
+  uploadKnowledge: async (agentId: string, fileUri: string, fileName: string, token: string): Promise<KnowledgeDoc> => {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: fileUri,
+      name: fileName,
+      type: 'application/pdf',
+    } as unknown as Blob);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000); // 2min for large files
+
+    const response = await fetch(`${Config.API_BASE_URL}/agents/${agentId}/knowledge`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      } as Record<string, string>,
+      body: formData,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      let errorMessage = `Upload failed: ${response.status}`;
+      try {
+        const err = await response.json();
+        if (err?.message) errorMessage = err.message;
+      } catch {
+        //
+      }
+      throw new Error(errorMessage);
+    }
+    return response.json() as Promise<KnowledgeDoc>;
+  },
+
+  /** Knowledge base: list documents for an agent. */
+  listKnowledge: (agentId: string, token: string) =>
+    request<{ documents: KnowledgeDoc[] }>(`/agents/${agentId}/knowledge`, {
+      method: 'GET',
+      headers: authHeaders(token),
+    }),
+
+  /** Knowledge base: delete a document from an agent's knowledge base. */
+  deleteKnowledge: (agentId: string, docId: string, token: string) =>
+    request<{ deleted: boolean }>(`/agents/${agentId}/knowledge/${docId}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    }),
 
   /** Get messages for a chat (requires auth) */
   getChatMessages: (chatId: string, token: string) =>
@@ -356,7 +477,7 @@ export const api = {
   deleteChat: (chatId: string, token: string) =>
     request<{ message: string }>(`/chats/${chatId}`, { method: 'DELETE', headers: authHeaders(token) }),
 
-  /** Chat completion with streaming (requires auth). Uses XHR for React Native compatibility. */
+  /** Chat completion with streaming (requires auth). Uses XHR for React Native compatibility. onExtra called when sources/places/images from web search. */
   chatCompleteStream: (
     messages: ChatMessage[],
     chatId: string | null,
@@ -368,6 +489,7 @@ export const api = {
     agentId?: string | null,
     pdfContext?: string,
     attachmentIds?: string[],
+    onExtra?: (extra: { sources?: SourceItem[]; places?: PlaceItem[]; images?: ImageItem[]; generated_images?: GeneratedImageItem[] }) => void,
   ): void => {
     const url = `${Config.API_BASE_URL}/chat?stream=true`;
     const body = JSON.stringify({
@@ -407,6 +529,14 @@ export const api = {
           const parsed = JSON.parse(data);
           if (parsed.chat_id) onChatId(parsed.chat_id);
           if (parsed.content) onChunk(parsed.content);
+          if (parsed.sources || parsed.places || parsed.images || parsed.generated_images) {
+            onExtra?.({
+              sources: parsed.sources,
+              places: parsed.places,
+              images: parsed.images,
+              generated_images: parsed.generated_images,
+            });
+          }
           if (parsed.error) throw new Error(parsed.error);
         } catch (e) {
           if (e instanceof SyntaxError) continue;
@@ -438,4 +568,53 @@ export const api = {
     xhr.ontimeout = () => onError(new Error('Request timeout'));
     xhr.send(body);
   },
+
+  /** Marketplace - Public */
+  listMarketplaceListings: (token?: string, params?: { status?: string; category?: string; sort?: string }) => {
+    const qs = new URLSearchParams(params as any).toString();
+    const endpoint = qs ? `/marketplace/listings?${qs}` : '/marketplace/listings';
+    return request<{ listings: MarketplaceListing[]; total: number }>(endpoint, {
+      method: 'GET',
+      headers: token ? authHeaders(token) : {},
+    });
+  },
+
+  getMarketplaceListing: (id: string, token?: string) =>
+    request<{ listing: MarketplaceListing }>(`/marketplace/listings/${id}`, {
+      method: 'GET',
+      headers: token ? authHeaders(token) : {},
+    }),
+
+  /** Marketplace - Protected */
+  createMarketplaceListing: (payload: CreateListingPayload, token: string) =>
+    request<{ listing: MarketplaceListing }>('/marketplace/listings', {
+      method: 'POST',
+      body: payload,
+      headers: authHeaders(token),
+    }),
+
+  updateMarketplaceListing: (id: string, payload: UpdateListingPayload, token: string) =>
+    request<{ listing: MarketplaceListing }>(`/marketplace/listings/${id}`, {
+      method: 'PUT',
+      body: payload,
+      headers: authHeaders(token),
+    }),
+
+  deleteMarketplaceListing: (id: string, token: string) =>
+    request<{ message: string }>(`/marketplace/listings/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    }),
+
+  getMyListings: (token: string) =>
+    request<{ listings: MarketplaceListing[] }>('/marketplace/listings/mine', {
+      method: 'GET',
+      headers: authHeaders(token),
+    }),
+
+  downloadListing: (id: string, token: string) =>
+    request<MarketplaceDownloadResponse>(`/marketplace/listings/${id}/download`, {
+      method: 'POST',
+      headers: authHeaders(token),
+    }),
 };

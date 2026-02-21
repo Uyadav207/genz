@@ -25,6 +25,10 @@ type Config struct {
 
 	// Gemini
 	GeminiAPIKey string
+	// GeminiVoiceModel is the Live API model ID (e.g. models/gemini-2.5-flash-native-audio-preview-12-2025). Set via GEMINI_VOICE_MODEL.
+	GeminiVoiceModel string
+	// GeminiLiveAPIVersion is "v1beta" or "v1alpha". Preview models may require v1alpha. Set via GEMINI_LIVE_API_VERSION.
+	GeminiLiveAPIVersion string
 
 	// SERP (SerpAPI: serpapi.com - GET https://serpapi.com/search?engine=google&q=...&api_key=...)
 	SERPAPIKey string
@@ -54,9 +58,11 @@ func Load() *Config {
 		SupabaseURL:    getEnvRequired("SUPABASE_URL"),
 		SupabaseKey:    getEnvRequired("SUPABASE_KEY"),
 		SupabaseSecret: getEnvRequired("SUPABASE_SECRET"),
-		JWTSecret:      getEnvRequired("JWT_SECRET"),
-		GeminiAPIKey:   getEnv("GEMINI_API_KEY", ""),
-		SERPAPIKey:     getEnv("SERP_API_KEY", ""),
+		JWTSecret:             getEnvRequired("JWT_SECRET"),
+		GeminiAPIKey:          getEnv("GEMINI_API_KEY", ""),
+		GeminiVoiceModel:      getEnv("GEMINI_VOICE_MODEL", "models/gemini-2.5-flash-native-audio-preview-12-2025"),
+		GeminiLiveAPIVersion:  getEnv("GEMINI_LIVE_API_VERSION", "v1beta"),
+		SERPAPIKey:            getEnv("SERP_API_KEY", ""),
 		Env:            env,
 	}
 

@@ -3,15 +3,14 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, type SourceItem, type PlaceItem, type ImageItem, type ResearchMeta } from '@/services/api';
-import { PlaceCards, ImageGallery, MessageBanner, SourcesSheet } from '@/components/chat';
+import { api, type SourceItem, type PlaceItem, type ImageItem, type GeneratedImageItem, type ResearchMeta } from '@/services/api';
+import { PlaceCards, ImageGallery, GeneratedImageGallery, MessageBanner, SourcesSheet } from '@/components/chat';
 import {
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Linking,
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,8 +24,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowUp,
   Menu,
-  MessageCircle,
-  Plus,
   X,
   Bot,
   Code,
@@ -34,20 +31,22 @@ import {
   ImageIcon,
   BrainCircuit,
   Globe,
+  Sparkles,
   User,
   SquarePen,
   Paperclip,
   FileText,
   Copy,
   BookOpen,
+  Mic,
+
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { DrawerNavigationProp } from '@react-navigation/drawer';
 import type { MainTabsParamList } from '@/types';
-import { DEFAULT_AGENT_ID, DEFAULT_AGENTS, FontSize, Spacing, AGENT_ICON_COLORS } from '@/constants';
-import type { AgentDef } from '@/constants';
+import { DEFAULT_AGENT_ID, DEFAULT_AGENTS, FontSize, Spacing, AGENT_ICON_COLORS, AGENT_EMPTY_GREETING, AGENTS_WITH_ACTION_CARDS } from '@/constants';
 import { useTheme, useAuth, useChats } from '@/contexts';
 import type { ThemeColors } from '@/contexts';
 import Markdown from 'react-native-markdown-display';
@@ -77,6 +76,8 @@ interface ChatMessage {
   places?: PlaceItem[];
   /** Images from web search */
   images?: ImageItem[];
+  /** AI-generated images (from Imagen) */
+  generated_images?: GeneratedImageItem[];
   /** Research-only metadata (partial, confidence, sub_queries) */
   researchMeta?: ResearchMeta;
 }
@@ -114,10 +115,10 @@ function truncateFileName(name: string, maxChars: number = 22): string {
 /* ------------------------------------------------------------------ */
 
 const SUGGESTIONS = [
-  { label: 'Make me a 7-day diet plan', icon: '🥗', color: '#22C55E' },
-  { label: 'Tell me a mind-blowing fact', icon: '🤯', color: '#3B82F6' },
+  { label: 'Make me a 7-day diet plan', icon: '🥗', color: '#06B6D4' },
+  { label: 'Tell me a mind-blowing fact', icon: '🤯', color: '#B57EDC' },
   { label: 'Write me a funny short story', icon: '✍️', color: '#F59E0B' },
-  { label: 'Tell me your best joke', icon: '😂', color: '#EC4899' },
+  { label: 'Tell me your best joke', icon: '😂', color: '#CDA4F0' },
 ];
 
 /** Slangy "thinking" phrases for GenZ mode typing indicator */
@@ -138,10 +139,12 @@ const GENZ_THINKING_PHRASES = [
 /*  Agent icon (uses shared DEFAULT_AGENTS / AGENT_ICON_COLORS)        */
 /* ------------------------------------------------------------------ */
 
-function AgentIcon({ name, size = 22 }: { name: string; size?: number }) {
-  const color = AGENT_ICON_COLORS[name] || '#6C63FF';
+const EMOJI_PREFIX = 'emoji:';
+
+function AgentIcon({ name, size = 22, color: colorOverride }: { name: string; size?: number; color?: string }) {
+  const color = colorOverride ?? (AGENT_ICON_COLORS[name] || '#B57EDC');
   switch (name) {
-    case 'genz': return <Bot size={size} color={color} />;
+    case 'genz': return <Sparkles size={size} color={color} />;
     case 'code': return <Code size={size} color={color} />;
     case 'pen': return <PenLine size={size} color={color} />;
     case 'image': return <ImageIcon size={size} color={color} />;
@@ -151,59 +154,25 @@ function AgentIcon({ name, size = 22 }: { name: string; size?: number }) {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/*  Agent Popup                                                        */
-/* ------------------------------------------------------------------ */
-
-function AgentPopup({
-  visible, onClose, onSelect,
-}: { visible: boolean; onClose: () => void; onSelect: (a: AgentDef) => void }) {
-  const { colors } = useTheme();
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={popupStyles.overlay} onPress={onClose}>
-        <Pressable style={[popupStyles.sheet, { backgroundColor: colors.background }]} onPress={(e) => e.stopPropagation()}>
-          <View style={popupStyles.header}>
-            <Text style={[popupStyles.title, { color: colors.text }]}>Add Agent</Text>
-            <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
-              <X size={22} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-          <Text style={[popupStyles.subtitle, { color: colors.textSecondary }]}>
-            Choose an agent to assist in this conversation
-          </Text>
-          <View style={popupStyles.list}>
-            {DEFAULT_AGENTS.map((agent) => (
-              <TouchableOpacity
-                key={agent.id} style={popupStyles.agentRow} activeOpacity={0.65}
-                onPress={() => { onSelect(agent); onClose(); }}
-              >
-                <View style={[popupStyles.agentIconBox, { backgroundColor: colors.surfaceSecondary }]}>
-                  <AgentIcon name={agent.iconName} />
-                </View>
-                <View style={popupStyles.agentInfo}>
-                  <Text style={[popupStyles.agentName, { color: colors.text }]}>{agent.name}</Text>
-                  <Text style={[popupStyles.agentDesc, { color: colors.textSecondary }]}>{agent.description}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
+/** Renders agent icon (Lucide) or emoji when iconName is "emoji:😀". */
+function AgentIconOrEmoji({ iconName, size = 32, color }: { iconName: string; size?: number; color?: string }) {
+  if (iconName.startsWith(EMOJI_PREFIX)) {
+    return <Text style={{ fontSize: size }}>{iconName.slice(EMOJI_PREFIX.length)}</Text>;
+  }
+  return <AgentIcon name={iconName} size={size} color={color} />;
 }
 
 /* ------------------------------------------------------------------ */
-/*  Sub-components                                                     */
+/*  Empty states                                                        */
 /* ------------------------------------------------------------------ */
 
-function EmptyState({ onSuggestionPress }: { onSuggestionPress: (t: string) => void }) {
+/** Empty state with 4 action cards (GenZ / General only). */
+function EmptyStateWithCards({ iconName, onSuggestionPress }: { iconName: string; onSuggestionPress: (t: string) => void }) {
   const { colors } = useTheme();
   return (
     <View style={emptyStyles.container}>
       <View style={[emptyStyles.iconCircle, { backgroundColor: colors.surfaceSecondary }]}>
-        <Text style={{ fontSize: 32 }}>{'👋'}</Text>
+        <AgentIconOrEmoji iconName={iconName} size={32} />
       </View>
       <Text style={[emptyStyles.title, { color: colors.text }]}>How can I help you?</Text>
       <Text style={[emptyStyles.subtitle, { color: colors.textSecondary }]}>
@@ -224,6 +193,20 @@ function EmptyState({ onSuggestionPress }: { onSuggestionPress: (t: string) => v
           </TouchableOpacity>
         ))}
       </View>
+    </View>
+  );
+}
+
+/** Empty state with agent name + personalized greeting only (no action cards). */
+function EmptyStatePersonalized({ agentName, greeting, iconName }: { agentName: string; greeting: string; iconName: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={emptyStyles.container}>
+      <View style={[emptyStyles.iconCircle, { backgroundColor: colors.surfaceSecondary }]}>
+        <AgentIconOrEmoji iconName={iconName} size={32} />
+      </View>
+      <Text style={[emptyStyles.title, { color: colors.text }]}>{agentName}</Text>
+      <Text style={[emptyStyles.subtitle, { color: colors.textSecondary }]}>{greeting}</Text>
     </View>
   );
 }
@@ -313,6 +296,66 @@ function ResearchStepsIndicator({ steps, colors }: { steps: ResearchProgressStep
 }
 
 /* ------------------------------------------------------------------ */
+/*  Image Generation loading placeholder (shimmer canvas)              */
+/* ------------------------------------------------------------------ */
+
+function ImageGeneratingPlaceholder({ colors }: { colors: ThemeColors }) {
+  const shimmer = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, { toValue: 1, duration: 1500, useNativeDriver: true }),
+        Animated.timing(shimmer, { toValue: 0, duration: 1500, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [shimmer]);
+
+  const opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] });
+
+  return (
+    <View style={imgPlaceholderStyles.container}>
+      <View style={[imgPlaceholderStyles.canvas, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+        <Animated.View style={[imgPlaceholderStyles.shimmerOverlay, { opacity, backgroundColor: colors.border }]} />
+        <View style={imgPlaceholderStyles.iconContainer}>
+          <ImageIcon size={36} color={colors.textSecondary} strokeWidth={1.5} />
+        </View>
+        <Text style={[imgPlaceholderStyles.label, { color: colors.textSecondary }]}>Creating your image…</Text>
+      </View>
+    </View>
+  );
+}
+
+const imgPlaceholderStyles = StyleSheet.create({
+  container: { marginTop: 4, width: '100%' },
+  canvas: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  shimmerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  iconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(128,128,128,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  label: { fontSize: 14, fontWeight: '500' },
+});
+
+/* ------------------------------------------------------------------ */
 /*  Markdown styles builder                                            */
 /* ------------------------------------------------------------------ */
 
@@ -365,22 +408,34 @@ function useMarkdownRules(colors: ThemeColors) {
 /*  ChatMessage Row                                                    */
 /* ------------------------------------------------------------------ */
 
-function ChatMessageRow({ item, isStreaming, colors, isDark, mdStyles, markdownRules, onLinkPress, onOpenSources, agentId, researchSteps }: {
-  item: ChatMessage; isStreaming?: boolean; colors: ThemeColors; isDark: boolean; mdStyles: ReturnType<typeof useMdStyles>; markdownRules?: Record<string, (node: { key?: string }, children: React.ReactNode, parent: unknown, styles: Record<string, object>) => React.ReactNode>; onLinkPress?: (url: string) => void; onOpenSources?: (sources: SourceItem[]) => void; agentId?: string; researchSteps?: ResearchProgressStep[];
+function ChatMessageRow({ item, isStreaming, colors, isDark, mdStyles, markdownRules, onLinkPress, onOpenSources, agentId, agentIconName, researchSteps, isImageGenAgent }: {
+  item: ChatMessage; isStreaming?: boolean; colors: ThemeColors; isDark: boolean; mdStyles: ReturnType<typeof useMdStyles>; markdownRules?: Record<string, (node: { key?: string }, children: React.ReactNode, parent: unknown, styles: Record<string, object>) => React.ReactNode>; onLinkPress?: (url: string) => void; onOpenSources?: (sources: SourceItem[]) => void; agentId?: string; agentIconName?: string; researchSteps?: ResearchProgressStep[]; isImageGenAgent?: boolean;
 }) {
   const isUser = item.role === 'user';
   const isGenZMode = agentId === DEFAULT_AGENT_ID;
   const showResearchSteps = !isUser && isStreaming && !item.content && researchSteps && researchSteps.length > 0;
-  // AI avatar: dark-mode friendly — use a background that contrasts with the icon in both themes
+  const showImageGenLoading = !isUser && isStreaming && !item.content && isImageGenAgent && !showResearchSteps;
+  // Determine if this agent uses an emoji icon
+  const isEmojiAgent = !!agentIconName?.startsWith(EMOJI_PREFIX);
   const assistantAvatarBg = isDark ? colors.surfaceSecondary : colors.text;
-  const assistantIconColor = colors.white;
 
   return (
     <View style={msgStyles.row}>
       <View style={msgStyles.avatarWrapper}>
-        <View style={[msgStyles.avatar, isUser ? { backgroundColor: colors.primary } : { backgroundColor: assistantAvatarBg }]}>
-          {isUser ? <User size={16} color={colors.white} /> : <Bot size={16} color={assistantIconColor} />}
-        </View>
+        {isUser ? (
+          <View style={[msgStyles.avatar, { backgroundColor: colors.primary }]}>
+            <User size={16} color={colors.white} />
+          </View>
+        ) : isEmojiAgent ? (
+          // Emoji icon: no background circle, just show emoji
+          <View style={msgStyles.emojiAvatar}>
+            <Text style={{ fontSize: 24, lineHeight: 30 }}>{agentIconName!.slice(EMOJI_PREFIX.length)}</Text>
+          </View>
+        ) : (
+          <View style={[msgStyles.avatar, { backgroundColor: assistantAvatarBg }]}>
+            <AgentIconOrEmoji iconName={agentIconName ?? 'bot'} size={15} color={colors.white} />
+          </View>
+        )}
         {!isUser && <View style={[msgStyles.onlineDot, { borderColor: colors.background }]} />}
       </View>
       <View style={msgStyles.content}>
@@ -388,6 +443,8 @@ function ChatMessageRow({ item, isStreaming, colors, isDark, mdStyles, markdownR
         {!isUser && !item.content && isStreaming ? (
           showResearchSteps ? (
             <ResearchStepsIndicator steps={researchSteps!} colors={colors} />
+          ) : showImageGenLoading ? (
+            <ImageGeneratingPlaceholder colors={colors} />
           ) : isGenZMode ? (
             <GenZThinkingIndicator colors={colors} />
           ) : (
@@ -425,7 +482,7 @@ function ChatMessageRow({ item, isStreaming, colors, isDark, mdStyles, markdownR
                   onLinkPress(url);
                   return true;
                 }
-                Linking.openURL(url).catch(() => {});
+                Linking.openURL(url).catch(() => { });
                 return true;
               }}
             >
@@ -437,36 +494,49 @@ function ChatMessageRow({ item, isStreaming, colors, isDark, mdStyles, markdownR
             {item.researchMeta?.partial && (
               <MessageBanner variant="partial" colors={colors} />
             )}
-            {item.sources && item.sources.length > 0 && (
-              <View style={msgStyles.sourceActionsRow}>
-                <TouchableOpacity
-                  style={[msgStyles.sourcesBtn, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
-                  onPress={() => onOpenSources?.(item.sources!)}
-                  activeOpacity={0.7}
-                >
-                  <BookOpen size={16} color={colors.primary} />
-                  <Text style={[msgStyles.sourcesBtnText, { color: colors.primary }]}>
-                    Sources ({item.sources.length})
+            {(item.sources?.length || item.places?.length || item.images?.length) ? (
+              <View style={msgStyles.webResultsSection}>
+                <View style={[msgStyles.webResultsHeader, { borderBottomColor: colors.border }]}>
+                  <Globe size={14} color={colors.primary} />
+                  <Text style={[msgStyles.webResultsTitle, { color: colors.textSecondary }]}>
+                    Web search results
                   </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[msgStyles.copyBtn, { borderColor: colors.border }]}
-                  onPress={() => {
-                    const lines = [item.content, '', 'Sources:'];
-                    (item.sources ?? []).forEach((s, i) => {
-                      lines.push(`${i + 1}. ${s.title || s.link}`, `   ${s.link}`);
-                    });
-                    Clipboard.setStringAsync(lines.join('\n')).catch(() => {});
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Copy size={14} color={colors.textSecondary} />
-                  <Text style={[msgStyles.copyBtnText, { color: colors.textSecondary }]}>Copy</Text>
-                </TouchableOpacity>
+                </View>
+                {item.sources && item.sources.length > 0 && (
+                  <View style={msgStyles.sourceActionsRow}>
+                    <TouchableOpacity
+                      style={[msgStyles.sourcesBtn, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
+                      onPress={() => onOpenSources?.(item.sources!)}
+                      activeOpacity={0.7}
+                    >
+                      <BookOpen size={16} color={colors.primary} />
+                      <Text style={[msgStyles.sourcesBtnText, { color: colors.primary }]}>
+                        Sources ({item.sources.length})
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[msgStyles.copyBtn, { borderColor: colors.border }]}
+                      onPress={() => {
+                        const lines = [item.content, '', 'Sources:'];
+                        (item.sources ?? []).forEach((s, i) => {
+                          lines.push(`${i + 1}. ${s.title || s.link}`, `   ${s.link}`);
+                        });
+                        Clipboard.setStringAsync(lines.join('\n')).catch(() => { });
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Copy size={14} color={colors.textSecondary} />
+                      <Text style={[msgStyles.copyBtnText, { color: colors.textSecondary }]}>Copy</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {item.places && item.places.length > 0 && <PlaceCards places={item.places} colors={colors} onLinkPress={onLinkPress} />}
+                {item.images && item.images.length > 0 && <ImageGallery images={item.images} colors={colors} onLinkPress={onLinkPress} />}
               </View>
+            ) : null}
+            {item.generated_images && item.generated_images.length > 0 && (
+              <GeneratedImageGallery images={item.generated_images} colors={colors} />
             )}
-            {item.places && item.places.length > 0 && <PlaceCards places={item.places} colors={colors} onLinkPress={onLinkPress} />}
-            {item.images && item.images.length > 0 && <ImageGallery images={item.images} colors={colors} onLinkPress={onLinkPress} />}
           </>
         )}
       </View>
@@ -482,7 +552,7 @@ export function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { accessToken } = useAuth();
-  const { chats, refetch: refetchChats } = useChats();
+  const { chats, refetch: refetchChats, setAgentId } = useChats();
   const navigation = useNavigation<DrawerNavigationProp<MainTabsParamList, 'Chat'>>();
   const openInAppBrowser = useCallback((url: string) => {
     if (url && /^https?:\/\//i.test(url)) {
@@ -490,7 +560,9 @@ export function ChatScreen() {
     }
   }, [navigation]);
   const route = useRoute();
-  const routeChatId = (route.params as { chatId?: string } | undefined)?.chatId;
+  const routeParams = route.params as { chatId?: string; agentId?: string; agentName?: string; agentIconName?: string; agentSkillIds?: string[] } | undefined;
+  const routeChatId = routeParams?.chatId;
+  const routeAgentId = routeParams?.agentId;
   const [chatId, setChatId] = useState<string | null>(null);
   const activeChatId = routeChatId ?? chatId;
   const currentChatTitle = activeChatId ? (chats.find((c) => c.id === activeChatId)?.title ?? 'New chat') : 'New chat';
@@ -500,15 +572,75 @@ export function ChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [showAgents, setShowAgents] = useState(false);
-  const defaultAgent = DEFAULT_AGENTS.find((a) => a.id === DEFAULT_AGENT_ID) ?? DEFAULT_AGENTS[0];
-  const [selectedAgent, setSelectedAgent] = useState<AgentDef>(defaultAgent);
   const [loadingChat, setLoadingChat] = useState(false);
+
+  const effectiveAgentId = routeAgentId ?? DEFAULT_AGENT_ID;
+  const effectiveAgentDef = useMemo(() => {
+    const fromDefaults = DEFAULT_AGENTS.find((a) => a.id === effectiveAgentId);
+    if (fromDefaults) return fromDefaults;
+    return {
+      id: effectiveAgentId,
+      name: routeParams?.agentName ?? 'Agent',
+      description: '',
+      iconName: (routeParams?.agentIconName as string) || 'bot',
+    };
+  }, [effectiveAgentId, routeParams?.agentName, routeParams?.agentIconName]);
+  const showActionCards = AGENTS_WITH_ACTION_CARDS.includes(effectiveAgentId);
+  const emptyStateGreeting = useMemo(() => {
+    if (AGENT_EMPTY_GREETING[effectiveAgentId]) return AGENT_EMPTY_GREETING[effectiveAgentId];
+    return `${effectiveAgentDef.name} — how can I help you today?`;
+  }, [effectiveAgentId, effectiveAgentDef.name]);
   const [pendingPDFs, setPendingPDFs] = useState<PendingPDFAttachment[]>([]);
   const [uploadingPDF, setUploadingPDF] = useState(false);
   const [sourcesSheetSources, setSourcesSheetSources] = useState<SourceItem[] | null>(null);
   /** Live research steps for the current streaming message (Perplexity-style). Key = assistant message id. */
   const [researchSteps, setResearchSteps] = useState<Record<string, ResearchProgressStep[]>>({});
+  /** Knowledge base upload feedback */
+  const [kbUploadMsg, setKbUploadMsg] = useState<string | null>(null);
+
+  // Check if current agent has knowledge_base skill
+  // If agentSkillIds not passed via navigation, fetch from API
+  const routeSkillIds = routeParams?.agentSkillIds;
+  const [fetchedSkillIds, setFetchedSkillIds] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (routeSkillIds || !effectiveAgentId || DEFAULT_AGENTS.some((a) => a.id === effectiveAgentId)) {
+      setFetchedSkillIds(null);
+      return;
+    }
+    // Custom agent without skill info — fetch it
+    if (!accessToken) return;
+    api.getAgent(effectiveAgentId, accessToken)
+      .then(({ agent }) => {
+        setFetchedSkillIds(agent?.skill_ids ?? []);
+      })
+      .catch(() => setFetchedSkillIds(null));
+  }, [effectiveAgentId, routeSkillIds, accessToken]);
+
+  const resolvedSkillIds = routeSkillIds ?? fetchedSkillIds;
+  const isKnowledgeBaseAgent = useMemo(() => {
+    return resolvedSkillIds?.includes('knowledge_base') ?? false;
+  }, [resolvedSkillIds]);
+
+  const isImageGenAgent = useMemo(() => {
+    if (effectiveAgentId === 'image') return true;
+    return resolvedSkillIds?.includes('image_generation') ?? false;
+  }, [effectiveAgentId, resolvedSkillIds]);
+
+  // Sync route agentId to ChatsContext for agent-scoped chat list
+  useEffect(() => {
+    setAgentId(routeAgentId ?? null);
+    if (accessToken) refetchChats(accessToken, routeAgentId ?? null);
+  }, [routeAgentId, accessToken, setAgentId, refetchChats]);
+
+  // When user selects an agent (no existing chatId in route), always start a new chat
+  useEffect(() => {
+    if (routeChatId != null) return; // Opening an existing chat from sidebar — don't reset
+    setChatId(null);
+    setMessages([]);
+    setResearchSteps({});
+    navigation.setParams({ chatId: undefined } as { chatId?: string });
+  }, [routeAgentId, routeChatId, navigation]);
 
   // Load messages when opening a chat from sidebar
   useFocusEffect(
@@ -519,6 +651,7 @@ export function ChatScreen() {
       api.getChatMessages(routeChatId, accessToken)
         .then(({ messages: list }) => {
           setChatId(routeChatId);
+          refetchChats(accessToken, routeAgentId ?? undefined);
           setMessages(list.map((m) => ({
             id: m.id,
             role: m.role as MessageRole,
@@ -527,12 +660,13 @@ export function ChatScreen() {
             sources: m.extra?.sources,
             places: m.extra?.places,
             images: m.extra?.images,
+            generated_images: m.extra?.generated_images,
             researchMeta: m.extra?.research_meta,
           })));
         })
-        .catch(() => {})
+        .catch(() => { })
         .finally(() => setLoadingChat(false));
-    }, [routeChatId, accessToken])
+    }, [routeChatId, routeAgentId, accessToken, refetchChats])
   );
 
   const scrollToEnd = useCallback(() => { setTimeout(() => { flatListRef.current?.scrollToEnd({ animated: true }); }, 100); }, []);
@@ -570,6 +704,29 @@ export function ChatScreen() {
     }
   }, [accessToken, uploadingPDF, activeChatId]);
 
+  /** Upload PDF to agent's knowledge base (not per-chat). */
+  const pickKnowledgePDF = useCallback(async () => {
+    if (!accessToken || uploadingPDF || !effectiveAgentId) return;
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const { uri, name } = result.assets[0];
+      setUploadingPDF(true);
+      await api.uploadKnowledge(effectiveAgentId, uri, name, accessToken);
+      setKbUploadMsg(`📖 "${name}" added to knowledge base`);
+      setTimeout(() => setKbUploadMsg(null), 4000);
+    } catch (err) {
+      console.warn('[pickKnowledgePDF]', err);
+      setKbUploadMsg('❌ Failed to upload to knowledge base');
+      setTimeout(() => setKbUploadMsg(null), 4000);
+    } finally {
+      setUploadingPDF(false);
+    }
+  }, [accessToken, uploadingPDF, effectiveAgentId]);
+
   const removePDF = useCallback((id: string) => {
     setPendingPDFs((prev) => prev.filter((p) => p.id !== id));
   }, []);
@@ -596,7 +753,7 @@ export function ChatScreen() {
         role: m.role as 'user' | 'assistant',
         content: m.content,
       }));
-      const agentId = selectedAgent?.id ?? DEFAULT_AGENT_ID;
+      const agentId = effectiveAgentId;
       const tools =
         agentId === 'web'
           ? ['web_search']
@@ -633,22 +790,23 @@ export function ChatScreen() {
             if (res.chat_id) {
               const wasNewChat = !chatId;
               setChatId(res.chat_id);
-              refetchChats(accessToken);
-              if (wasNewChat && accessToken) setTimeout(() => refetchChats(accessToken), 2500);
+              refetchChats(accessToken, effectiveAgentId);
+              if (wasNewChat && accessToken) setTimeout(() => refetchChats(accessToken, effectiveAgentId), 2500);
             }
             const aiContent = res.content?.trim() || "I couldn't generate a response. Please try again.";
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === assistantMsgId
                   ? {
-                      ...msg,
-                      content: aiContent,
-                      fullContent: aiContent,
-                      sources: res.sources,
-                      places: res.places,
-                      images: res.images,
-                      researchMeta: res.research_meta,
-                    }
+                    ...msg,
+                    content: aiContent,
+                    fullContent: aiContent,
+                    sources: res.sources,
+                    places: res.places,
+                    images: res.images,
+                    generated_images: res.generated_images,
+                    researchMeta: res.research_meta,
+                  }
                   : msg
               )
             );
@@ -663,12 +821,13 @@ export function ChatScreen() {
           },
           (err) => {
             setIsTyping(false);
-            setMessages((prev) => prev.map((msg) => msg.id === assistantMsgId ? { ...msg, content: `Sorry, I couldn't complete your request: ${err.message}` } : msg));
+            setMessages((prev) => prev.filter((msg) => msg.id !== assistantMsgId));
             setResearchSteps((prev) => {
               const next = { ...prev };
               delete next[assistantMsgId];
               return next;
             });
+            Alert.alert('Something went wrong', 'Please try again with a new message.', [{ text: 'OK' }]);
             scrollToEnd();
           },
           pdfContext,
@@ -692,9 +851,9 @@ export function ChatScreen() {
         (newChatId) => {
           const wasNewChat = !chatId;
           setChatId(newChatId);
-          refetchChats(accessToken!);
+          refetchChats(accessToken!, effectiveAgentId);
           if (wasNewChat && accessToken) {
-            setTimeout(() => refetchChats(accessToken), 2500);
+            setTimeout(() => refetchChats(accessToken, effectiveAgentId), 2500);
           }
         },
         () => {
@@ -709,31 +868,46 @@ export function ChatScreen() {
         },
         (err) => {
           setIsTyping(false);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMsgId ? { ...msg, content: `Sorry, I couldn't complete your request: ${err.message}` } : msg
-            )
-          );
+          setMessages((prev) => prev.filter((msg) => msg.id !== assistantMsgId));
           if (hasPDF) setPendingPDFs([]);
+          Alert.alert('Something went wrong', 'Please try again with a new message.', [{ text: 'OK' }]);
           scrollToEnd();
         },
         agentId,
         pdfContext,
-        attachmentIds
+        attachmentIds,
+        (extra) => {
+          if (extra.sources || extra.places || extra.images || extra.generated_images) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMsgId
+                  ? {
+                    ...msg,
+                    sources: extra.sources ?? msg.sources,
+                    places: extra.places ?? msg.places,
+                    images: extra.images ?? msg.images,
+                    generated_images: extra.generated_images ?? msg.generated_images,
+                  }
+                  : msg
+              )
+            );
+            scrollToEnd();
+          }
+        }
       );
       return;
     } catch (err: unknown) {
       setIsTyping(false);
-      const errMsg = err instanceof Error ? err.message : 'Something went wrong';
-      setMessages((prev) => prev.map((msg) => msg.id === assistantMsgId ? { ...msg, content: `Sorry, I couldn't complete your request: ${errMsg}` } : msg));
+      setMessages((prev) => prev.filter((msg) => msg.id !== assistantMsgId));
       setResearchSteps((prev) => {
         const next = { ...prev };
         delete next[assistantMsgId];
         return next;
       });
+      Alert.alert('Something went wrong', 'Please try again with a new message.', [{ text: 'OK' }]);
       scrollToEnd();
     }
-  }, [inputText, isTyping, messages, scrollToEnd, chatId, accessToken, refetchChats, selectedAgent, pendingPDFs]);
+  }, [inputText, isTyping, messages, scrollToEnd, chatId, accessToken, refetchChats, effectiveAgentId, pendingPDFs]);
 
   const handleSuggestion = useCallback((text: string) => { sendMessage(text); }, [sendMessage]);
 
@@ -747,10 +921,12 @@ export function ChatScreen() {
       markdownRules={markdownRules}
       onLinkPress={openInAppBrowser}
       onOpenSources={setSourcesSheetSources}
-      agentId={selectedAgent?.id}
+      agentId={effectiveAgentId}
+      agentIconName={effectiveAgentDef.iconName}
       researchSteps={researchSteps[item.id]}
+      isImageGenAgent={isImageGenAgent}
     />
-  ), [isTyping, colors, isDark, mdStyles, markdownRules, openInAppBrowser, selectedAgent?.id, researchSteps]);
+  ), [isTyping, colors, isDark, mdStyles, markdownRules, openInAppBrowser, effectiveAgentId, effectiveAgentDef.iconName, researchSteps, isImageGenAgent]);
 
   const hasMessages = messages.length > 0;
   const canSend = (inputText.trim().length > 0 || pendingPDFs.length > 0) && !isTyping;
@@ -776,11 +952,20 @@ export function ChatScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">
           {currentChatTitle}
         </Text>
-        {hasMessages && (
-          <TouchableOpacity style={styles.newChatBtn} activeOpacity={0.7} onPress={startNewChat}>
-            <SquarePen size={20} color={colors.text} />
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={() => navigation.navigate('Voice', { agentId: effectiveAgentId, chatId: activeChatId ?? undefined })}
+            activeOpacity={0.7}
+          >
+            <Mic size={20} color={colors.text} />
           </TouchableOpacity>
-        )}
+          {hasMessages && (
+            <TouchableOpacity style={styles.headerIconBtn} activeOpacity={0.7} onPress={startNewChat}>
+              <SquarePen size={20} color={colors.text} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
@@ -788,11 +973,18 @@ export function ChatScreen() {
           <FlatList ref={flatListRef} data={messages} renderItem={renderItem} keyExtractor={(m) => m.id}
             contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled" onContentSizeChange={() => scrollToEnd()} />
+        ) : showActionCards ? (
+          <EmptyStateWithCards iconName={effectiveAgentDef.iconName} onSuggestionPress={handleSuggestion} />
         ) : (
-          <EmptyState onSuggestionPress={handleSuggestion} />
+          <EmptyStatePersonalized agentName={effectiveAgentDef.name} greeting={emptyStateGreeting} iconName={effectiveAgentDef.iconName} />
         )}
 
         {/* Input Bar — ChatGPT-style. Attachment pills above input with file name + remove. */}
+        {kbUploadMsg && (
+          <View style={[styles.kbBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.kbBannerText, { color: colors.text }]}>{kbUploadMsg}</Text>
+          </View>
+        )}
         <View style={[styles.inputBarOuter, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           {pendingPDFs.length > 0 && (
             <View style={styles.attachmentPillsWrap}>
@@ -814,19 +1006,6 @@ export function ChatScreen() {
               ))}
             </View>
           )}
-          {selectedAgent.id !== DEFAULT_AGENT_ID && (
-            <View style={styles.agentBadgeRow}>
-              <View style={[styles.agentBadge, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
-                <AgentIcon name={selectedAgent.iconName} size={16} />
-                <Text style={[styles.agentBadgeText, { color: colors.text }]}>
-                  {selectedAgent.id === 'web' ? 'Web' : selectedAgent.id === 'brain' ? 'Research' : selectedAgent.name}
-                </Text>
-                <TouchableOpacity onPress={() => setSelectedAgent(defaultAgent)} activeOpacity={0.7}>
-                  <X size={14} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
           <View style={[
             styles.inputBar,
             {
@@ -840,13 +1019,6 @@ export function ChatScreen() {
             },
           ]}>
             <TouchableOpacity
-              style={[styles.inputBarIconBtn, { backgroundColor: colors.surfaceSecondary }]}
-              onPress={() => setShowAgents(true)}
-              activeOpacity={0.6}
-            >
-              <Plus size={18} color={colors.text} strokeWidth={2} />
-            </TouchableOpacity>
-            <TouchableOpacity
               style={styles.inputBarIconBtn}
               onPress={pickPDF}
               disabled={uploadingPDF}
@@ -859,11 +1031,11 @@ export function ChatScreen() {
               value={inputText}
               onChangeText={setInputText}
               placeholder={
-                selectedAgent.id === 'web'
+                effectiveAgentDef.id === 'web'
                   ? 'Search the web...'
-                  : selectedAgent.id === 'brain'
+                  : effectiveAgentDef.id === 'brain'
                     ? 'Ask for deep research...'
-                    : 'Message GenZ AI...'
+                    : `Message ${effectiveAgentDef.name}...`
               }
               placeholderTextColor={colors.textSecondary}
               multiline
@@ -877,9 +1049,7 @@ export function ChatScreen() {
                 styles.sendBtn,
                 {
                   backgroundColor: canSend
-                    ? isDark
-                      ? colors.white
-                      : '#000000'
+                    ? colors.primary
                     : colors.surfaceSecondary,
                 },
               ]}
@@ -889,16 +1059,15 @@ export function ChatScreen() {
             >
               <ArrowUp
                 size={18}
-                color={canSend ? (isDark ? '#000000' : colors.white) : colors.textSecondary}
+                color={canSend ? colors.white : colors.textSecondary}
                 strokeWidth={2.5}
               />
             </TouchableOpacity>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoidingView >
 
-      <AgentPopup visible={showAgents} onClose={() => setShowAgents(false)} onSelect={(agent) => setSelectedAgent(agent)} />
-    </View>
+    </View >
   );
 }
 
@@ -911,13 +1080,11 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.md, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 8, position: 'relative' },
   menuBtn: { position: 'absolute', left: Spacing.md, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  newChatBtn: { position: 'absolute', right: Spacing.md, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 17, fontWeight: '600' },
+  headerRight: { position: 'absolute', right: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  headerIconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 17, fontWeight: '600', textAlign: 'center', maxWidth: '60%' },
   listContent: { paddingHorizontal: Spacing.md, paddingTop: Spacing.md, paddingBottom: Spacing.sm },
   inputBarOuter: { paddingHorizontal: Spacing.md, paddingTop: Spacing.md },
-  agentBadgeRow: { marginBottom: 8, gap: 4 },
-  agentBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
-  agentBadgeText: { fontSize: 13, fontWeight: '600' },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -966,12 +1133,22 @@ const styles = StyleSheet.create({
   researchStepRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1 },
   researchStepDot: { width: 6, height: 6, borderRadius: 3 },
   researchStepText: { fontSize: 13, flex: 1 },
+  kbBanner: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  kbBannerText: { fontSize: 13, fontWeight: '500', textAlign: 'center' },
 });
 
 const msgStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 24, gap: 12 },
   avatarWrapper: { position: 'relative', marginTop: 2 },
   avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  emojiAvatar: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   onlineDot: { position: 'absolute', bottom: -1, right: -1, width: 10, height: 10, borderRadius: 5, backgroundColor: '#22C55E', borderWidth: 2 },
   content: { flex: 1 },
   roleLabel: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
@@ -981,11 +1158,27 @@ const msgStyles = StyleSheet.create({
   attachmentNameInMsg: { fontSize: 13 },
   thinkingRow: { flexDirection: 'row', gap: 4, paddingVertical: 8 },
   thinkingDot: { width: 8, height: 8, borderRadius: 4 },
+  webResultsSection: {
+    marginTop: 14,
+    paddingTop: 12,
+    gap: 12,
+  },
+  webResultsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  webResultsTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
   sourceActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginTop: 10,
     flexWrap: 'wrap',
   },
   sourcesBtn: {
@@ -1022,16 +1215,3 @@ const emptyStyles = StyleSheet.create({
   chipText: { fontSize: 15, fontWeight: '500', flex: 1 },
 });
 
-const popupStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.xl },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontSize: 18, fontWeight: '700' },
-  subtitle: { fontSize: 13, marginTop: 4, marginBottom: 20 },
-  list: { gap: 4 },
-  agentRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12 },
-  agentIconBox: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  agentInfo: { flex: 1, gap: 2 },
-  agentName: { fontSize: 15, fontWeight: '600' },
-  agentDesc: { fontSize: 13 },
-});

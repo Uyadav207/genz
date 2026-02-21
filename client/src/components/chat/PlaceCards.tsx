@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MapPin, Phone, Star } from 'lucide-react-native';
 import type { PlaceItem } from '@/services/api';
 import type { ThemeColors } from '@/contexts';
@@ -41,8 +41,8 @@ export function PlaceCards({ places, colors, onLinkPress }: PlaceCardsProps) {
   return (
     <View style={styles.container}>
       <Text style={[styles.title, { color: colors.textSecondary }]}>Places</Text>
-      <View style={styles.scroll}>
-        {places.slice(0, 6).map((p, i) => (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        {places.slice(0, 8).map((p, i) => (
           <TouchableOpacity
             key={`${p.title}-${i}`}
             style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -95,23 +95,25 @@ export function PlaceCards({ places, colors, onLinkPress }: PlaceCardsProps) {
             </View>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { marginTop: 12, gap: 8 },
-  title: { fontSize: 13, fontWeight: '600' },
-  scroll: { gap: 10 },
+  container: { marginTop: 4, gap: 8 },
+  title: { fontSize: 13, fontWeight: '600', marginBottom: 4 },
+  scroll: { gap: 12, paddingRight: 8 },
   card: {
     flexDirection: 'row',
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     overflow: 'hidden',
+    width: 280,
+    minHeight: 100,
   },
-  image: { width: 80, height: 80 },
-  imagePlaceholder: { width: 80, height: 80, alignItems: 'center', justifyContent: 'center' },
+  image: { width: 96, height: 96 },
+  imagePlaceholder: { width: 96, height: 96, alignItems: 'center', justifyContent: 'center' },
   cardBody: { flex: 1, padding: 10, justifyContent: 'space-between', gap: 4 },
   placeTitle: { fontSize: 15, fontWeight: '600' },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

@@ -13,13 +13,24 @@ export type NavigationParamList = {
 
 /** Bottom tab screens inside the authenticated shell */
 export type MainTabsParamList = {
-  Chat: { chatId?: string } | undefined;
+  Chat: { chatId?: string; agentId?: string; agentName?: string; agentIconName?: string } | undefined;
+  Voice: { agentId?: string; chatId?: string } | undefined;
   Agents: undefined;
+  Marketplace: undefined;
   Settings: undefined;
 };
 
-/** Stack inside the Agents drawer tab (list + create flow) */
+/** Stack inside the Agents drawer tab (list + create + edit flow) */
 export type AgentsStackParamList = {
   AgentsList: undefined;
   CreateAgent: undefined;
+  EditAgent: { agentId: string };
+};
+
+export type MarketplaceStackParamList = {
+  MarketplaceList: undefined;
+  MarketplaceDetail: { listingId: string };
+  PublishListing: { agentId: string };
+  EditListing: { listingId: string };
+  MyListings: undefined;
 };

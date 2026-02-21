@@ -4,10 +4,11 @@
 
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { MessageCircle, Bot, Settings } from 'lucide-react-native';
+import { MessageCircle, Bot, Settings, Compass } from 'lucide-react-native';
 import { ChatScreen } from '@/screens/ChatScreen';
 import { AgentsScreen } from '@/screens/AgentsScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
+import { MarketplaceStack } from './MarketplaceStack';
 import { FontSize } from '@/constants';
 import { useTheme } from '@/contexts';
 import type { MainTabsParamList } from '@/types';
@@ -52,6 +53,15 @@ export function MainTabs() {
         options={{
           tabBarIcon: ({ color, size }) => (
             <Bot size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Marketplace"
+        component={MarketplaceStack}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Compass size={size} color={color} />
           ),
         }}
       />

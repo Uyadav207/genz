@@ -28,11 +28,11 @@ export function ImageGallery({ images, colors, onLinkPress }: ImageGalleryProps)
     <View style={styles.container}>
       <Text style={[styles.title, { color: colors.textSecondary }]}>Images</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {images.slice(0, 8).map((img, i) => (
+        {images.slice(0, 12).map((img, i) => (
           <TouchableOpacity
             key={`${img.imageUrl}-${i}`}
-            style={[styles.imageWrapper, { borderColor: colors.border }]}
-            activeOpacity={0.8}
+            style={[styles.imageWrapper, { borderColor: colors.border, backgroundColor: colors.surfaceSecondary }]}
+            activeOpacity={0.85}
             onPress={() => (img.link ? openLink(img.link) : openLink(img.imageUrl))}
           >
             <Image source={{ uri: img.imageUrl }} style={styles.image} resizeMode="cover" />
@@ -49,10 +49,10 @@ export function ImageGallery({ images, colors, onLinkPress }: ImageGalleryProps)
 }
 
 const styles = StyleSheet.create({
-  container: { marginTop: 12, gap: 8 },
-  title: { fontSize: 13, fontWeight: '600' },
-  scroll: { gap: 10, paddingRight: 8 },
-  imageWrapper: { width: 120, borderRadius: 8, borderWidth: 1, overflow: 'hidden' },
-  image: { width: 120, height: 90 },
-  caption: { fontSize: 11, padding: 6 },
+  container: { marginTop: 4, gap: 8 },
+  title: { fontSize: 13, fontWeight: '600', marginBottom: 4 },
+  scroll: { gap: 12, paddingRight: 8 },
+  imageWrapper: { width: 140, borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
+  image: { width: 140, height: 110 },
+  caption: { fontSize: 11, padding: 8, lineHeight: 14 },
 });

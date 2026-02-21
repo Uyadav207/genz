@@ -134,7 +134,7 @@ const rowStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#EAE5F2',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -327,7 +327,7 @@ const modalStyles = StyleSheet.create({
   fieldInput: {
     fontSize: 16,
     color: Colors.text,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#EAE5F2',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: Platform.OS === 'ios' ? 14 : 10,
@@ -419,7 +419,7 @@ export function SettingsScreen() {
   const navigation = useNavigation<DrawerNavigationProp<MainTabsParamList, 'Settings'>>();
 
   return (
-    <View style={[styles.root, { backgroundColor: isDark ? colors.background : '#F9FAFB', paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: isDark ? colors.background : '#FAFAFF', paddingTop: insets.top }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <TouchableOpacity style={styles.menuBtn} onPress={() => navigation.openDrawer()} activeOpacity={0.7}>
@@ -488,7 +488,7 @@ export function SettingsScreen() {
         </Section>
 
         {/* ── Sign Out ── */}
-        <TouchableOpacity style={[styles.signOutButton, { backgroundColor: colors.card, borderColor: isDark ? '#7F1D1D' : '#FCA5A5' }]} activeOpacity={0.7} onPress={handleSignOut}>
+        <TouchableOpacity style={[styles.signOutButton, { backgroundColor: colors.card, borderColor: isDark ? '#5B2060' : '#DDA0DD' }]} activeOpacity={0.7} onPress={handleSignOut}>
           <LogOut size={18} color={colors.error} />
           <Text style={[styles.signOutText, { color: colors.error }]}>Sign Out</Text>
         </TouchableOpacity>
@@ -496,7 +496,7 @@ export function SettingsScreen() {
         {/* ── App Version ── */}
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.textSecondary }]}>GenZ AI</Text>
-          <Text style={[styles.footerVersion, { color: isDark ? '#555' : '#9CA3AF' }]}>Version {APP_VERSION}</Text>
+          <Text style={[styles.footerVersion, { color: isDark ? '#4A4460' : '#9D93B0' }]}>Version {APP_VERSION}</Text>
         </View>
       </ScrollView>
 
@@ -521,7 +521,7 @@ export function SettingsScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FAFAFF',
   },
   header: {
     flexDirection: 'row',
@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#FCA5A5',
+    borderColor: '#DDA0DD',
     paddingVertical: 14,
   },
   signOutText: {
@@ -652,6 +652,6 @@ const styles = StyleSheet.create({
   },
   footerVersion: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: '#9D93B0',
   },
 });

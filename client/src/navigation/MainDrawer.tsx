@@ -6,10 +6,12 @@
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { ChatScreen } from '@/screens/ChatScreen';
+import { VoiceScreen } from '@/screens/VoiceScreen';
 import { AgentsStack } from '@/navigation/AgentsStack';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { SidebarContent } from '@/components/SidebarContent';
 import { ChatsProvider, useTheme } from '@/contexts';
+import { SIDEBAR_WIDTH } from '@/constants';
 import type { MainTabsParamList } from '@/types';
 
 const Drawer = createDrawerNavigator<MainTabsParamList>();
@@ -25,11 +27,12 @@ export function MainDrawer() {
         headerShown: false,
         drawerPosition: 'left',
         drawerType: 'front',
-        drawerStyle: { backgroundColor: colors.background },
+        drawerStyle: { backgroundColor: colors.background, width: SIDEBAR_WIDTH },
         swipeEdgeWidth: 40,
       }}
     >
       <Drawer.Screen name="Chat" component={ChatScreen} />
+      <Drawer.Screen name="Voice" component={VoiceScreen} />
       <Drawer.Screen name="Agents" component={AgentsStack} />
       <Drawer.Screen name="Settings" component={SettingsScreen} />
     </Drawer.Navigator>
