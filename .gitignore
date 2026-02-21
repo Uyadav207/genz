@@ -5,6 +5,7 @@
 server/.env
 client/.env
 client/.env.*
+!client/.env.example
 
 # OS
 .DS_Store
@@ -23,3 +24,10 @@ Thumbs.db
 
 # Agent team (local only)
 .agents/
+
+# Untracked: only root README.md is repo documentation
+docs/
+audio-orb/
+server/supabase/
+server/migrations/
+STREAMING_IMPLEMENTATION.md
