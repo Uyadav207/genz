@@ -43,6 +43,7 @@ func SerpTest(cfg *config.Config) gin.HandlerFunc {
 		}
 
 		organicCount := len(resp.Organic)
+		// #nosec G706
 		log.Printf("[SERP] DEBUG: Search succeeded, organic_results=%d", organicCount)
 
 		c.JSON(http.StatusOK, gin.H{

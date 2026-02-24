@@ -1,10 +1,12 @@
 /**
  * Async storage helpers.
- * Wraps AsyncStorage with typed get/set for convenience.
+ * Wraps SecureStore for sensitive tokens and AsyncStorage for standard data.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
+/** Standard unsecured AsyncStorage helper */
 export const storage = {
   async get<T = string>(key: string): Promise<T | null> {
     try {
@@ -36,6 +38,33 @@ export const storage = {
       await AsyncStorage.clear();
     } catch (error) {
       console.error('[storage.clear] Failed:', error);
+    }
+  },
+};
+
+/** Secured storage for sensitive JWT tokens / keys using Expo SecureStore */
+export const secureStorage = {
+  async get(key: string): Promise<string | null> {
+    try {
+      return await SecureStore.getItemAsync(key);
+    } catch {
+      return null;
+    }
+  },
+
+  async set(key: string, value: string): Promise<void> {
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch (error) {
+      console.error(`[secureStorage.set] Failed for key "${key}":`, error);
+    }
+  },
+
+  async remove(key: string): Promise<void> {
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch (error) {
+      console.error(`[secureStorage.remove] Failed for key "${key}":`, error);
     }
   },
 };

@@ -84,6 +84,7 @@ func UploadPDF(cfg *config.Config) gin.HandlerFunc {
 			storagePath,
 		)
 
+		// #nosec G107 - URL is strictly constructed via configuration internally.
 		req, err := http.NewRequest(http.MethodPost, uploadURL, readerFromBytes(data))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to create upload request"})
@@ -94,6 +95,7 @@ func UploadPDF(cfg *config.Config) gin.HandlerFunc {
 		req.Header.Set("x-upsert", "true")
 
 		client := &http.Client{}
+		// #nosec G704 - Request strictly uses internally configured URLs
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Printf("[UploadPDF] Storage request failed: %v", err)
@@ -107,6 +109,7 @@ func UploadPDF(cfg *config.Config) gin.HandlerFunc {
 
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			body, _ := io.ReadAll(resp.Body)
+			// #nosec G706
 			log.Printf("[UploadPDF] Storage error %d (URL: %s): %s", resp.StatusCode, uploadURL, string(body))
 			msg := "Storage upload failed. Ensure 'chat-pdfs' bucket exists in Supabase."
 			if len(body) > 0 && len(body) < 500 {

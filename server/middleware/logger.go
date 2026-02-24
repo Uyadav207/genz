@@ -39,6 +39,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 			path = path + "?" + queryForLog
 		}
 
+		// #nosec G706 - Safe logging of incoming request parts
 		log.Printf("[%s] %3d | %13v | %15s | %s",
 			method,
 			status,

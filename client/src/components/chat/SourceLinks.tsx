@@ -21,7 +21,7 @@ export function SourceLinks({ sources, colors, onLinkPress }: SourceLinksProps) 
     if (onLinkPress) {
       onLinkPress(url);
     } else {
-      Linking.openURL(url).catch(() => {});
+      Linking.openURL(url).catch(() => { });
     }
   };
 
@@ -31,15 +31,15 @@ export function SourceLinks({ sources, colors, onLinkPress }: SourceLinksProps) 
       <View style={styles.list}>
         {sources.slice(0, 8).map((s, i) => (
           <TouchableOpacity
-            key={`${s.link}-${i}`}
+            key={`${s.url}-${i}`}
             style={[styles.linkRow, { borderColor: colors.border }]}
             activeOpacity={0.7}
-            onPress={() => handlePress(s.link)}
+            onPress={() => handlePress(s.url)}
           >
             <ExternalLink size={14} color={colors.primary} />
             <View style={styles.linkContent}>
               <Text style={[styles.linkText, { color: colors.primary }]} numberOfLines={1} ellipsizeMode="tail">
-                {s.title || s.link}
+                {s.title || s.url}
               </Text>
               {s.snippet ? (
                 <Text style={[styles.snippet, { color: colors.textSecondary }]} numberOfLines={2} ellipsizeMode="tail">

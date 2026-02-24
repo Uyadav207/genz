@@ -63,15 +63,15 @@ export function SourcesSheet({
           >
             {sources.map((s, i) => (
               <TouchableOpacity
-                key={`${s.link}-${i}`}
+                key={`${s.url}-${i}`}
                 style={[styles.row, { borderColor: colors.border }]}
                 activeOpacity={0.7}
-                onPress={() => handlePress(s.link)}
+                onPress={() => handlePress(s.url)}
               >
                 <ExternalLink size={16} color={colors.primary} />
                 <View style={styles.rowContent}>
                   <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={2}>
-                    {s.title || s.link}
+                    {s.title || s.url}
                   </Text>
                   {s.snippet ? (
                     <Text style={[styles.snippet, { color: colors.textSecondary }]} numberOfLines={2}>

@@ -21,12 +21,12 @@ export function PlaceCards({ places, colors, onLinkPress }: PlaceCardsProps) {
     if (onLinkPress) {
       onLinkPress(url);
     } else {
-      Linking.openURL(url).catch(() => {});
+      Linking.openURL(url).catch(() => { });
     }
   };
 
   const openPhone = (phone: string) => {
-    Linking.openURL(`tel:${phone.replace(/\D/g, '')}`).catch(() => {});
+    Linking.openURL(`tel:${phone.replace(/\D/g, '')}`).catch(() => { });
   };
 
   const openMaps = (address: string) => {
@@ -34,7 +34,7 @@ export function PlaceCards({ places, colors, onLinkPress }: PlaceCardsProps) {
     if (onLinkPress) {
       onLinkPress(mapsUrl);
     } else {
-      Linking.openURL(mapsUrl).catch(() => {});
+      Linking.openURL(mapsUrl).catch(() => { });
     }
   };
 
@@ -44,7 +44,7 @@ export function PlaceCards({ places, colors, onLinkPress }: PlaceCardsProps) {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {places.slice(0, 8).map((p, i) => (
           <TouchableOpacity
-            key={`${p.title}-${i}`}
+            key={`${p.name}-${i}`}
             style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
             activeOpacity={0.8}
             onPress={() => p.link && openLink(p.link)}
@@ -58,7 +58,7 @@ export function PlaceCards({ places, colors, onLinkPress }: PlaceCardsProps) {
             )}
             <View style={styles.cardBody}>
               <Text style={[styles.placeTitle, { color: colors.text }]} numberOfLines={1}>
-                {p.title}
+                {p.name}
               </Text>
               {p.rating != null && p.rating > 0 && (
                 <View style={styles.ratingRow}>
@@ -80,16 +80,6 @@ export function PlaceCards({ places, colors, onLinkPress }: PlaceCardsProps) {
                   <Text style={[styles.infoText, { color: colors.text }]} numberOfLines={1}>
                     {p.address}
                   </Text>
-                </TouchableOpacity>
-              )}
-              {p.phone && (
-                <TouchableOpacity
-                  style={styles.infoRow}
-                  onPress={() => openPhone(p.phone!)}
-                  activeOpacity={0.7}
-                >
-                  <Phone size={14} color={colors.primary} />
-                  <Text style={[styles.infoText, { color: colors.primary }]}>{p.phone}</Text>
                 </TouchableOpacity>
               )}
             </View>

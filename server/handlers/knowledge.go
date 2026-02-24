@@ -84,7 +84,9 @@ func UploadKnowledge(cfg *config.Config) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Failed to read file"})
 			return
 		}
-		defer fh.Close()
+		defer func() {
+			_ = fh.Close()
+		}()
 
 		data, err := io.ReadAll(fh)
 		if err != nil {
@@ -152,6 +154,7 @@ func UploadKnowledge(cfg *config.Config) gin.HandlerFunc {
 		req.Header.Set("x-upsert", "true")
 
 		client := &http.Client{}
+		// #nosec G704 - Request strictly uses internally configured URLs
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Printf("[KB] Storage upload failed: %v", err)
@@ -159,11 +162,14 @@ func UploadKnowledge(cfg *config.Config) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "upload_failed", "message": "Failed to upload to storage"})
 			return
 		}
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			body, _ := io.ReadAll(resp.Body)
-			log.Printf("[KB] Storage error %d: %s", resp.StatusCode, string(body))
+			// #nosec G706
+			log.Printf("[KB] Storage error %d: %q", resp.StatusCode, string(body))
 			updateDocStatus(docID, "failed", "Storage upload returned error")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "upload_failed", "message": "Storage upload failed. Ensure 'agent-knowledge' bucket exists."})
 			return

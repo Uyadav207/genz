@@ -18,7 +18,7 @@ interface CitationPillProps {
 export function CitationPill({ sourceIndex, sources, colors, onLinkPress }: CitationPillProps) {
   const idx = sourceIndex - 1;
   const source = sources[idx];
-  const url = source?.link;
+  const url = source?.url;
 
   const handlePress = () => {
     if (url && onLinkPress) {

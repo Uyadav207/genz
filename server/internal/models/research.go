@@ -27,7 +27,7 @@ type ResearchMeta struct {
 
 // ResearchResponse is the output from the research agent.
 type ResearchResponse struct {
-	Answer      string          `json:"answer"`
-	Sources     []OrganicResult `json:"sources,omitempty"`
-	ResearchMeta *ResearchMeta  `json:"research_meta,omitempty"`
+	Answer       string          `json:"answer"`
+	Sources      []OrganicResult `json:"sources,omitempty"`
+	ResearchMeta *ResearchMeta   `json:"research_meta,omitempty"`
 }

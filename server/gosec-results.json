@@ -1,0 +1,418 @@
+{
+	"Golang errors": {},
+	"Issues": [
+		{
+			"severity": "HIGH",
+			"confidence": "HIGH",
+			"cwe": null,
+			"rule_id": "G704",
+			"details": "SSRF via taint analysis",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/internal/skills/knowledge/retriever.go",
+			"code": "165: \n166: \tresp, err := http.DefaultClient.Do(httpReq)\n167: \tif err != nil {\n",
+			"line": "166",
+			"column": "36",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "HIGH",
+			"cwe": null,
+			"rule_id": "G704",
+			"details": "SSRF via taint analysis",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/internal/skills/knowledge/embedding.go",
+			"code": "104: \n105: \tresp, err := e.httpClient.Do(httpReq)\n106: \tif err != nil {\n",
+			"line": "105",
+			"column": "30",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "HIGH",
+			"cwe": null,
+			"rule_id": "G704",
+			"details": "SSRF via taint analysis",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/internal/skills/imagen/imagen.go",
+			"code": "160: \n161: \tresp, err := http.DefaultClient.Do(req)\n162: \tif err != nil {\n",
+			"line": "161",
+			"column": "36",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "HIGH",
+			"cwe": null,
+			"rule_id": "G704",
+			"details": "SSRF via taint analysis",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/internal/skills/imagen/imagen.go",
+			"code": "97: \n98: \tresp, err := http.DefaultClient.Do(httpReq)\n99: \tif err != nil {\n",
+			"line": "98",
+			"column": "36",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "HIGH",
+			"cwe": null,
+			"rule_id": "G704",
+			"details": "SSRF via taint analysis",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/internal/clients/serp.go",
+			"code": "238: \t}\n239: \tresp, err := c.httpClient.Do(req)\n240: \tif err != nil {\n",
+			"line": "239",
+			"column": "30",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "HIGH",
+			"cwe": null,
+			"rule_id": "G704",
+			"details": "SSRF via taint analysis",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/internal/clients/gemini_tools.go",
+			"code": "64: \t\thttpReq.Header.Set(\"Content-Type\", \"application/json\")\n65: \t\tresp, err := c.httpClient.Do(httpReq)\n66: \t\tif err != nil {\n",
+			"line": "65",
+			"column": "31",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "HIGH",
+			"cwe": null,
+			"rule_id": "G704",
+			"details": "SSRF via taint analysis",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/internal/clients/gemini.go",
+			"code": "95: \thttpReq.Header.Set(\"Content-Type\", \"application/json\")\n96: \tresp, err := c.httpClient.Do(httpReq)\n97: \tif err != nil {\n",
+			"line": "96",
+			"column": "30",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "HIGH",
+			"cwe": null,
+			"rule_id": "G704",
+			"details": "SSRF via taint analysis",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/handlers/upload.go",
+			"code": "96: \t\tclient := \u0026http.Client{}\n97: \t\tresp, err := client.Do(req)\n98: \t\tif err != nil {\n",
+			"line": "97",
+			"column": "25",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "HIGH",
+			"cwe": null,
+			"rule_id": "G704",
+			"details": "SSRF via taint analysis",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/handlers/knowledge.go",
+			"code": "154: \t\tclient := \u0026http.Client{}\n155: \t\tresp, err := client.Do(req)\n156: \t\tif err != nil {\n",
+			"line": "155",
+			"column": "25",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "88",
+				"url": "https://cwe.mitre.org/data/definitions/88.html"
+			},
+			"rule_id": "G107",
+			"details": "Potential HTTP request made with variable url",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/services/chat_service.go",
+			"code": "607: \turl := fmt.Sprintf(\"%s/%s:generateContent?key=%s\", geminiBaseURL, geminiModel, s.cfg.GeminiAPIKey)\n608: \tresp, err := http.Post(url, \"application/json\", bytes.NewReader(jsonBody))\n609: \tif err != nil {\n",
+			"line": "608",
+			"column": "15",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "88",
+				"url": "https://cwe.mitre.org/data/definitions/88.html"
+			},
+			"rule_id": "G107",
+			"details": "Potential HTTP request made with variable url",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/services/chat_service.go",
+			"code": "420: \n421: \tresp, err := http.Post(url, \"application/json\", bytes.NewReader(jsonBody))\n422: \tif err != nil {\n",
+			"line": "421",
+			"column": "15",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "499",
+				"url": "https://cwe.mitre.org/data/definitions/499.html"
+			},
+			"rule_id": "G117",
+			"details": "Exported struct field \"RefreshToken\" (JSON key \"refresh_token\") matches secret pattern",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/models/user.go",
+			"code": "59: \tAccessToken  string       `json:\"access_token\"`\n60: \tRefreshToken string       `json:\"refresh_token\"`\n61: \tExpiresIn    int          `json:\"expires_in\"`\n",
+			"line": "60",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "499",
+				"url": "https://cwe.mitre.org/data/definitions/499.html"
+			},
+			"rule_id": "G117",
+			"details": "Exported struct field \"RefreshToken\" (JSON key \"refresh_token\") matches secret pattern",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/models/user.go",
+			"code": "43: type RefreshTokenRequest struct {\n44: \tRefreshToken string `json:\"refresh_token\" binding:\"required\"`\n45: }\n",
+			"line": "44",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "499",
+				"url": "https://cwe.mitre.org/data/definitions/499.html"
+			},
+			"rule_id": "G117",
+			"details": "Exported struct field \"RefreshToken\" (JSON key \"RefreshToken\") matches secret pattern",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/utils/jwt.go",
+			"code": "19: \tAccessToken  string\n20: \tRefreshToken string\n21: \tExpiresIn    int // seconds until the access token expires\n",
+			"line": "20",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "499",
+				"url": "https://cwe.mitre.org/data/definitions/499.html"
+			},
+			"rule_id": "G117",
+			"details": "Exported struct field \"Password\" (JSON key \"password\") matches secret pattern",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/models/user.go",
+			"code": "53: type UpdatePasswordRequest struct {\n54: \tPassword string `json:\"password\" binding:\"required,min=6\"`\n55: }\n",
+			"line": "54",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "499",
+				"url": "https://cwe.mitre.org/data/definitions/499.html"
+			},
+			"rule_id": "G117",
+			"details": "Exported struct field \"Password\" (JSON key \"password\") matches secret pattern",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/models/user.go",
+			"code": "38: \tUsername string `json:\"username\" binding:\"required\"`\n39: \tPassword string `json:\"password\" binding:\"required\"`\n40: }\n",
+			"line": "39",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "499",
+				"url": "https://cwe.mitre.org/data/definitions/499.html"
+			},
+			"rule_id": "G117",
+			"details": "Exported struct field \"Password\" (JSON key \"password\") matches secret pattern",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/models/user.go",
+			"code": "30: \tUsername string `json:\"username\" binding:\"required,min=3,max=30\"`\n31: \tPassword string `json:\"password\" binding:\"required,min=6\"`\n32: \tName     string `json:\"name\" binding:\"required\"`\n",
+			"line": "31",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "499",
+				"url": "https://cwe.mitre.org/data/definitions/499.html"
+			},
+			"rule_id": "G117",
+			"details": "Exported struct field \"JWTSecret\" (JSON key \"JWTSecret\") matches secret pattern",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/config/config.go",
+			"code": "23: \t// JWT\n24: \tJWTSecret string\n25: \n",
+			"line": "24",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "499",
+				"url": "https://cwe.mitre.org/data/definitions/499.html"
+			},
+			"rule_id": "G117",
+			"details": "Exported struct field \"AccessToken\" (JSON key \"access_token\") matches secret pattern",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/models/user.go",
+			"code": "58: type AuthResponse struct {\n59: \tAccessToken  string       `json:\"access_token\"`\n60: \tRefreshToken string       `json:\"refresh_token\"`\n",
+			"line": "59",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "499",
+				"url": "https://cwe.mitre.org/data/definitions/499.html"
+			},
+			"rule_id": "G117",
+			"details": "Exported struct field \"AccessToken\" (JSON key \"AccessToken\") matches secret pattern",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/utils/jwt.go",
+			"code": "18: type TokenPair struct {\n19: \tAccessToken  string\n20: \tRefreshToken string\n",
+			"line": "19",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": null,
+			"rule_id": "G706",
+			"details": "Log injection via taint analysis",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/middleware/logger.go",
+			"code": "41: \n42: \t\tlog.Printf(\"[%s] %3d | %13v | %15s | %s\",\n43: \t\t\tmethod,\n",
+			"line": "42",
+			"column": "13",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": null,
+			"rule_id": "G706",
+			"details": "Log injection via taint analysis",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/internal/clients/serp.go",
+			"code": "245: \tif resp.StatusCode != http.StatusOK {\n246: \t\tlog.Printf(\"[SERP] Status %d\", resp.StatusCode)\n247: \t\treturn nil, fmt.Errorf(\"serp: status %d\", resp.StatusCode)\n",
+			"line": "246",
+			"column": "13",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": null,
+			"rule_id": "G706",
+			"details": "Log injection via taint analysis",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/handlers/upload.go",
+			"code": "109: \t\t\tbody, _ := io.ReadAll(resp.Body)\n110: \t\t\tlog.Printf(\"[UploadPDF] Storage error %d (URL: %s): %s\", resp.StatusCode, uploadURL, string(body))\n111: \t\t\tmsg := \"Storage upload failed. Ensure 'chat-pdfs' bucket exists in Supabase.\"\n",
+			"line": "110",
+			"column": "14",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": null,
+			"rule_id": "G706",
+			"details": "Log injection via taint analysis",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/handlers/knowledge.go",
+			"code": "165: \t\t\tbody, _ := io.ReadAll(resp.Body)\n166: \t\t\tlog.Printf(\"[KB] Storage error %d: %s\", resp.StatusCode, string(body))\n167: \t\t\tupdateDocStatus(docID, \"failed\", \"Storage upload returned error\")\n",
+			"line": "166",
+			"column": "14",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": null,
+			"rule_id": "G706",
+			"details": "Log injection via taint analysis",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/handlers/debug_serp.go",
+			"code": "45: \t\torganicCount := len(resp.Organic)\n46: \t\tlog.Printf(\"[SERP] DEBUG: Search succeeded, organic_results=%d\", organicCount)\n47: \n",
+			"line": "46",
+			"column": "13",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/services/chat_service.go",
+			"code": "626: func (s *ChatService) updateChatTitle(chatID, title string) {\n627: \tdatabase.GetAdminClient().DB.From(\"chats\").Update(map[string]interface{}{\"title\": title}).Eq(\"id\", chatID).Execute(\u0026[]models.Chat{})\n628: }\n",
+			"line": "627",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/internal/skills/knowledge/retriever.go",
+			"code": "173: \t\tvar buf bytes.Buffer\n174: \t\tbuf.ReadFrom(resp.Body)\n175: \t\treturn nil, fmt.Errorf(\"rpc error %d: %s\", resp.StatusCode, buf.String())\n",
+			"line": "174",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/utkarshyadav/Desktop/GenZ/server/internal/clients/gemini_tools.go",
+			"code": "70: \t\t_, _ = buf.ReadFrom(resp.Body)\n71: \t\tresp.Body.Close()\n72: \t\tif resp.StatusCode != http.StatusOK {\n",
+			"line": "71",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		}
+	],
+	"Stats": {
+		"files": 61,
+		"lines": 7152,
+		"nosec": 0,
+		"found": 28
+	},
+	"GosecVersion": "dev"
+}

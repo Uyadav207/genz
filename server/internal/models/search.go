@@ -25,8 +25,8 @@ type PlaceResult struct {
 	ImageURL  string  `json:"imageUrl,omitempty"`
 	Rating    float64 `json:"rating,omitempty"`
 	Reviews   int     `json:"reviews,omitempty"`
-	Price     string  `json:"price,omitempty"`     // e.g. "$$"
-	Type      string  `json:"type,omitempty"`     // e.g. "Coffee shop"
+	Price     string  `json:"price,omitempty"` // e.g. "$$"
+	Type      string  `json:"type,omitempty"`  // e.g. "Coffee shop"
 	Link      string  `json:"link,omitempty"`
 	Position  int     `json:"position,omitempty"`
 	Thumbnail string  `json:"thumbnail,omitempty"` // alternate field name from some APIs
@@ -41,9 +41,9 @@ type ImageResult struct {
 
 // SearchResponse aggregates all search result types from Serper.
 type SearchResponse struct {
-	Organic       []OrganicResult `json:"organic,omitempty"`
-	Places        []PlaceResult   `json:"places,omitempty"`
-	Images        []ImageResult   `json:"images,omitempty"`
+	Organic        []OrganicResult `json:"organic,omitempty"`
+	Places         []PlaceResult   `json:"places,omitempty"`
+	Images         []ImageResult   `json:"images,omitempty"`
 	KnowledgeGraph *struct {
 		Title       string `json:"title"`
 		Type        string `json:"type"`

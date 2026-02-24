@@ -12,9 +12,9 @@ import (
 
 // ResearchService runs the research agent and returns the answer with sources.
 type ResearchService struct {
-	agent         *research.Agent
-	geminiAPIKey  string
-	serpAPIKey    string
+	agent        *research.Agent
+	geminiAPIKey string
+	serpAPIKey   string
 }
 
 // NewResearchService creates a new ResearchService with wired dependencies.

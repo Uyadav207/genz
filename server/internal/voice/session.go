@@ -4,7 +4,7 @@ import "sync"
 
 // Message is a single transcript turn (user or assistant).
 type Message struct {
-	Role    string `json:"role"`    // "user" or "assistant"
+	Role    string `json:"role"` // "user" or "assistant"
 	Content string `json:"content"`
 }
 

@@ -96,12 +96,14 @@ func (e *Embedder) embedSingle(ctx context.Context, text string) ([]float32, err
 	}
 
 	url := fmt.Sprintf("%s/%s:embedContent?key=%s", EmbeddingBaseURL, EmbeddingModel, e.apiKey)
+	// #nosec G107 - URL is strictly constructed via hardcoded constant internally, no user-controlled host.
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("new request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
+	// #nosec G704 - Request strictly uses internally configured URLs
 	resp, err := e.httpClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("request: %w", err)

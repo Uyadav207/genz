@@ -155,6 +155,7 @@ func (r *Retriever) searchChunks(ctx context.Context, agentID, queryVecStr strin
 	supabaseURL := database.GetAdminClient().BaseURL
 	rpcURL := fmt.Sprintf("%s/rest/v1/rpc/match_knowledge_chunks", supabaseURL)
 
+	// #nosec G107 - URL is strictly constructed via environment configuration internally.
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, rpcURL, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("new rpc request: %w", err)
@@ -163,6 +164,7 @@ func (r *Retriever) searchChunks(ctx context.Context, agentID, queryVecStr strin
 	httpReq.Header.Set("apikey", database.GetAdminServiceKey())
 	httpReq.Header.Set("Authorization", "Bearer "+database.GetAdminServiceKey())
 
+	// #nosec G704 - Request strictly uses internally configured URLs
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("rpc request: %w", err)
@@ -171,7 +173,7 @@ func (r *Retriever) searchChunks(ctx context.Context, agentID, queryVecStr strin
 
 	if resp.StatusCode != http.StatusOK {
 		var buf bytes.Buffer
-		buf.ReadFrom(resp.Body)
+		_, _ = buf.ReadFrom(resp.Body)
 		return nil, fmt.Errorf("rpc error %d: %s", resp.StatusCode, buf.String())
 	}
 

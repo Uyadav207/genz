@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/genz/server/database"
 	"github.com/genz/server/models"
 	"github.com/genz/server/utils"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )

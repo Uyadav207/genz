@@ -90,7 +90,6 @@ func NewResolver(repo AgentRepository) *Resolver {
 	return &Resolver{repo: repo, builtin: builtin}
 }
 
-
 // Resolve returns AgentConfig for the given agent ID and user.
 // Built-in IDs: return from map. UUID: load from repo.
 func (r *Resolver) Resolve(ctx context.Context, agentID, userID string) (*domain.AgentConfig, error) {

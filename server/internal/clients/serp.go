@@ -55,21 +55,21 @@ type serpapiLocalResponse struct {
 }
 
 type serpapiPlaceItem struct {
-	Position     int     `json:"position"`
-	Title        string  `json:"title"`
-	Address      string  `json:"address"`
-	Phone        string  `json:"phone"`
-	Rating       float64 `json:"rating"`
-	Reviews      int     `json:"reviews"`
-	Price        string  `json:"price"`
-	Type         string  `json:"type"`
-	Thumbnail    string  `json:"thumbnail"`
-	SerpThumb    string  `json:"serpapi_thumbnail"`
-	PlaceID      string  `json:"place_id"`
-	PlaceIDSearch string `json:"place_id_search"`
-	Links        *struct {
-		Phone     string `json:"phone"`
-		Website   string `json:"website"`
+	Position      int     `json:"position"`
+	Title         string  `json:"title"`
+	Address       string  `json:"address"`
+	Phone         string  `json:"phone"`
+	Rating        float64 `json:"rating"`
+	Reviews       int     `json:"reviews"`
+	Price         string  `json:"price"`
+	Type          string  `json:"type"`
+	Thumbnail     string  `json:"thumbnail"`
+	SerpThumb     string  `json:"serpapi_thumbnail"`
+	PlaceID       string  `json:"place_id"`
+	PlaceIDSearch string  `json:"place_id_search"`
+	Links         *struct {
+		Phone      string `json:"phone"`
+		Website    string `json:"website"`
 		Directions string `json:"directions"`
 	} `json:"links"`
 }
@@ -232,10 +232,12 @@ func (c *SerpClient) get(ctx context.Context, params map[string]string) ([]byte,
 	u.RawQuery = q.Encode()
 	fullURL := u.String()
 	log.Printf("[SERP] GET serpapi.com/search.json?engine=google&q=%s", params["q"])
+	// #nosec G107 - URL is strictly constructed via hardcoded constant internally, no user-controlled host.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("serp: new request: %w", err)
 	}
+	// #nosec G704 - Request strictly uses internally configured URLs
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		log.Printf("[SERP] Request failed: %v", err)
@@ -243,6 +245,7 @@ func (c *SerpClient) get(ctx context.Context, params map[string]string) ([]byte,
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		// #nosec G706
 		log.Printf("[SERP] Status %d", resp.StatusCode)
 		return nil, fmt.Errorf("serp: status %d", resp.StatusCode)
 	}

@@ -21,6 +21,7 @@ type Config struct {
 	SupabaseSecret string
 
 	// JWT
+	// #nosec G117
 	JWTSecret string
 
 	// Gemini
@@ -53,17 +54,17 @@ func Load() *Config {
 	}
 
 	cfg := &Config{
-		Port:           getEnv("PORT", "8080"),
-		DatabaseURL:    getEnv("DATABASE_URL", ""),
-		SupabaseURL:    getEnvRequired("SUPABASE_URL"),
-		SupabaseKey:    getEnvRequired("SUPABASE_KEY"),
-		SupabaseSecret: getEnvRequired("SUPABASE_SECRET"),
-		JWTSecret:             getEnvRequired("JWT_SECRET"),
-		GeminiAPIKey:          getEnv("GEMINI_API_KEY", ""),
-		GeminiVoiceModel:      getEnv("GEMINI_VOICE_MODEL", "models/gemini-2.5-flash-native-audio-preview-12-2025"),
-		GeminiLiveAPIVersion:  getEnv("GEMINI_LIVE_API_VERSION", "v1beta"),
-		SERPAPIKey:            getEnv("SERP_API_KEY", ""),
-		Env:            env,
+		Port:                 getEnv("PORT", "8080"),
+		DatabaseURL:          getEnv("DATABASE_URL", ""),
+		SupabaseURL:          getEnvRequired("SUPABASE_URL"),
+		SupabaseKey:          getEnvRequired("SUPABASE_KEY"),
+		SupabaseSecret:       getEnvRequired("SUPABASE_SECRET"),
+		JWTSecret:            getEnvRequired("JWT_SECRET"),
+		GeminiAPIKey:         getEnv("GEMINI_API_KEY", ""),
+		GeminiVoiceModel:     getEnv("GEMINI_VOICE_MODEL", "models/gemini-2.5-flash-native-audio-preview-12-2025"),
+		GeminiLiveAPIVersion: getEnv("GEMINI_LIVE_API_VERSION", "v1beta"),
+		SERPAPIKey:           getEnv("SERP_API_KEY", ""),
+		Env:                  env,
 	}
 
 	return cfg

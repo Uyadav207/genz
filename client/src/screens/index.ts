@@ -1,8 +1,6 @@
 export { HomeScreen } from './HomeScreen';
 export { ChatScreen } from './ChatScreen';
 export { AgentsScreen } from './AgentsScreen';
-export { CustomAgentsScreen } from './CustomAgentsScreen';
-export { DefaultAgentsScreen } from './DefaultAgentsScreen';
 export { SettingsScreen } from './SettingsScreen';
 export { SignInScreen } from './SignInScreen';
 export { SignUpScreen } from './SignUpScreen';

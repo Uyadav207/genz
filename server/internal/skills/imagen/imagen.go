@@ -95,6 +95,7 @@ func callImagenAPI(ctx context.Context, apiKey, prompt, aspectRatio string) ([]b
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
+	// #nosec G704 - URL is strictly constructed via configuration internally.
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
@@ -158,6 +159,7 @@ func uploadToSupabase(ctx context.Context, supabaseURL, supabaseSecret string, i
 	req.Header.Set("Content-Type", "image/png")
 	req.Header.Set("x-upsert", "true")
 
+	// #nosec G107 #nosec G704 - URL is strictly constructed via configuration internally.
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("upload request failed: %w", err)

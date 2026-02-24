@@ -88,11 +88,13 @@ func (c *GeminiClient) Generate(ctx context.Context, userPrompt, systemInstructi
 		return "", fmt.Errorf("gemini: marshal request: %w", err)
 	}
 	url := fmt.Sprintf("%s/%s:generateContent?key=%s", GeminiBaseURL, GeminiModel, c.apiKey)
+	// #nosec G107 - URL is strictly constructed via hardcoded constant internally, no user-controlled host.
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return "", fmt.Errorf("gemini: new request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	// #nosec G704 - Request strictly uses internally configured URLs
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
 		return "", fmt.Errorf("gemini: request failed: %w", err)

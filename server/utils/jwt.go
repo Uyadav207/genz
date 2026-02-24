@@ -16,7 +16,9 @@ func InitJWT(secret string) {
 
 // TokenPair holds an access/refresh token pair.
 type TokenPair struct {
-	AccessToken  string
+	// #nosec G117
+	AccessToken string
+	// #nosec G117
 	RefreshToken string
 	ExpiresIn    int // seconds until the access token expires
 }

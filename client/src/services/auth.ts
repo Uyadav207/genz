@@ -1,5 +1,5 @@
 import { api } from '@/services/api';
-import { storage } from '@/utils/storage';
+import { storage, secureStorage } from '@/utils/storage';
 import type { AuthResponse, SignInPayload, SignUpPayload, SuccessResponse, UserResponse } from '@/types';
 
 const STORAGE_KEYS = {
@@ -36,8 +36,8 @@ export async function getMe(accessToken: string): Promise<SuccessResponse<UserRe
 
 export async function loadSession(): Promise<StoredSession | null> {
   const [accessToken, refreshToken, user] = await Promise.all([
-    storage.get<string>(STORAGE_KEYS.accessToken),
-    storage.get<string>(STORAGE_KEYS.refreshToken),
+    secureStorage.get(STORAGE_KEYS.accessToken),
+    secureStorage.get(STORAGE_KEYS.refreshToken),
     storage.get<UserResponse>(STORAGE_KEYS.user),
   ]);
 
@@ -47,16 +47,16 @@ export async function loadSession(): Promise<StoredSession | null> {
 
 export async function saveSession(session: StoredSession): Promise<void> {
   await Promise.all([
-    storage.set(STORAGE_KEYS.accessToken, session.accessToken),
-    storage.set(STORAGE_KEYS.refreshToken, session.refreshToken),
+    secureStorage.set(STORAGE_KEYS.accessToken, session.accessToken),
+    secureStorage.set(STORAGE_KEYS.refreshToken, session.refreshToken),
     storage.set(STORAGE_KEYS.user, session.user),
   ]);
 }
 
 export async function clearSession(): Promise<void> {
   await Promise.all([
-    storage.remove(STORAGE_KEYS.accessToken),
-    storage.remove(STORAGE_KEYS.refreshToken),
+    secureStorage.remove(STORAGE_KEYS.accessToken),
+    secureStorage.remove(STORAGE_KEYS.refreshToken),
     storage.remove(STORAGE_KEYS.user),
   ]);
 }

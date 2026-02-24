@@ -172,7 +172,7 @@ export function MarketplaceDetailScreen() {
 const styles = StyleSheet.create({
     wrapper: { flex: 1 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    errorText: { fontSize: FontSize.md },
+    errorText: { fontSize: FontSize.base },
     scrollContent: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl },
     headerArea: { alignItems: 'center', marginBottom: Spacing.xl },
     mainIconWrap: {

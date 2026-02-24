@@ -3,9 +3,9 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/genz/server/database"
 	"github.com/genz/server/models"
+	"github.com/gin-gonic/gin"
 )
 
 // GetProfile returns the authenticated user's profile from the "profiles" table.

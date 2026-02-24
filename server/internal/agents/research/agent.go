@@ -131,7 +131,7 @@ func (a *Agent) Run(ctx context.Context, query string, personalityPrompt string)
 	}
 
 	return &models.ResearchResponse{
-		Answer: answer,
+		Answer:  answer,
 		Sources: sources,
 		ResearchMeta: &models.ResearchMeta{
 			Partial:    false,
@@ -180,7 +180,7 @@ func (a *Agent) partialFromRanked(ranked []models.RankedResult, subQueries []str
 		confidence = "low"
 	}
 	return &models.ResearchResponse{
-		Answer: "Research was incomplete due to time limits. Here's what we found so far — you may want to verify key facts.",
+		Answer:  "Research was incomplete due to time limits. Here's what we found so far — you may want to verify key facts.",
 		Sources: sources,
 		ResearchMeta: &models.ResearchMeta{
 			Partial:    true,

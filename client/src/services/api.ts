@@ -68,16 +68,16 @@ export interface ChatMessage {
 
 /** Organic search result (web/research) */
 export interface SourceItem {
+  id?: string;
   title: string;
-  link: string;
+  url: string;
+  domain?: string;
   snippet?: string;
 }
 
-/** Place result (restaurants, businesses) */
 export interface PlaceItem {
-  title: string;
+  name: string;
   address?: string;
-  phone?: string;
   imageUrl?: string;
   rating?: number;
   reviews?: number;

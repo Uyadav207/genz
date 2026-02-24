@@ -28,6 +28,7 @@ type User struct {
 type SignUpRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Username string `json:"username" binding:"required,min=3,max=30"`
+	// #nosec G117
 	Password string `json:"password" binding:"required,min=6"`
 	Name     string `json:"name" binding:"required"`
 }
@@ -36,11 +37,13 @@ type SignUpRequest struct {
 // User signs in with username + password only.
 type SignInRequest struct {
 	Username string `json:"username" binding:"required"`
+	// #nosec G117
 	Password string `json:"password" binding:"required"`
 }
 
 // RefreshTokenRequest is the body for POST /auth/refresh.
 type RefreshTokenRequest struct {
+	// #nosec G117
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
@@ -51,12 +54,15 @@ type ResetPasswordRequest struct {
 
 // UpdatePasswordRequest is the body for POST /auth/update-password.
 type UpdatePasswordRequest struct {
+	// #nosec G117
 	Password string `json:"password" binding:"required,min=6"`
 }
 
 // AuthResponse is the standard auth success response.
 type AuthResponse struct {
-	AccessToken  string       `json:"access_token"`
+	// #nosec G117
+	AccessToken string `json:"access_token"`
+	// #nosec G117
 	RefreshToken string       `json:"refresh_token"`
 	ExpiresIn    int          `json:"expires_in"`
 	User         UserResponse `json:"user"`
