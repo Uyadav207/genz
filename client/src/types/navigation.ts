@@ -11,8 +11,9 @@ export type NavigationParamList = {
   InAppBrowser: { url: string };
 };
 
-/** Bottom tab screens inside the authenticated shell */
+/** Drawer (main) screens inside the authenticated shell */
 export type MainTabsParamList = {
+  Home: undefined;
   Chat: { chatId?: string; agentId?: string; agentName?: string; agentIconName?: string } | undefined;
   Voice: { agentId?: string; chatId?: string } | undefined;
   Agents: undefined;
@@ -23,6 +24,8 @@ export type MainTabsParamList = {
 /** Stack inside the Agents drawer tab (list + create + edit flow) */
 export type AgentsStackParamList = {
   AgentsList: undefined;
+  CustomAgents: undefined;
+  DefaultAgents: undefined;
   CreateAgent: undefined;
   EditAgent: { agentId: string };
 };

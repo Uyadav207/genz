@@ -23,12 +23,9 @@ import {
   Menu,
   Moon,
   Pencil,
-  Shield,
   Sun,
   Smartphone,
   Trash2,
-  User,
-  X,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { DrawerNavigationProp } from '@react-navigation/drawer';
@@ -420,12 +417,13 @@ export function SettingsScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: isDark ? colors.background : '#FAFAFF', paddingTop: insets.top }]}>
-      {/* Header */}
+      {/* Header — title centered, icons left/right */}
       <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <TouchableOpacity style={styles.menuBtn} onPress={() => navigation.openDrawer()} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.headerIconBtn} onPress={() => navigation.openDrawer()} activeOpacity={0.7}>
           <Menu size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>Settings</Text>
+        <View style={styles.headerIconBtn} />
       </View>
 
       <ScrollView
@@ -455,11 +453,9 @@ export function SettingsScreen() {
           <Pencil size={18} color={colors.textSecondary} />
         </TouchableOpacity>
 
-        {/* ── Account ── */}
-        <Section title="Account" colors={colors}>
-          <SettingsRow icon={<User size={18} color={colors.text} />} label="Edit Profile" value="Name, username, bio" onPress={() => setShowEditModal(true)} colors={colors} />
-          <Divider colors={colors} />
-          <SettingsRow icon={<Shield size={18} color={colors.text} />} label="Email" value={email || 'Not set'} showChevron={false} colors={colors} />
+        {/* ── Danger Zone ── */}
+        <Section title="Danger Zone" colors={colors}>
+          <SettingsRow icon={<Trash2 size={18} color={colors.error} />} label="Delete Account" value="Permanently delete all your data" onPress={handleDeleteAccount} danger colors={colors} />
         </Section>
 
         {/* ── Appearance ── */}
@@ -482,11 +478,6 @@ export function SettingsScreen() {
           </View>
         </Section>
 
-        {/* ── Danger Zone ── */}
-        <Section title="Danger Zone" colors={colors}>
-          <SettingsRow icon={<Trash2 size={18} color={colors.error} />} label="Delete Account" value="Permanently delete all your data" onPress={handleDeleteAccount} danger colors={colors} />
-        </Section>
-
         {/* ── Sign Out ── */}
         <TouchableOpacity style={[styles.signOutButton, { backgroundColor: colors.card, borderColor: isDark ? '#5B2060' : '#DDA0DD' }]} activeOpacity={0.7} onPress={handleSignOut}>
           <LogOut size={18} color={colors.error} />
@@ -495,7 +486,7 @@ export function SettingsScreen() {
 
         {/* ── App Version ── */}
         <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: colors.textSecondary }]}>GenZ AI</Text>
+          <Text style={[styles.footerText, { color: colors.textSecondary }]}>GenZ</Text>
           <Text style={[styles.footerVersion, { color: isDark ? '#4A4460' : '#9D93B0' }]}>Version {APP_VERSION}</Text>
         </View>
       </ScrollView>
@@ -532,12 +523,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
   },
-  menuBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  headerIconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   headerTitle: {
     flex: 1,
     fontSize: 28,
     fontWeight: '700',
     color: Colors.text,
+    textAlign: 'center',
   },
   scroll: {
     flex: 1,

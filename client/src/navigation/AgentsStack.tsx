@@ -5,6 +5,8 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AgentsScreen } from '@/screens/AgentsScreen';
+import { CustomAgentsScreen } from '@/screens/CustomAgentsScreen';
+import { DefaultAgentsScreen } from '@/screens/DefaultAgentsScreen';
 import { CreateAgentScreen } from '@/screens/CreateAgentScreen';
 import { EditAgentScreen } from '@/screens/EditAgentScreen';
 import type { AgentsStackParamList } from '@/types';
@@ -19,6 +21,8 @@ export function AgentsStack() {
       }}
     >
       <Stack.Screen name="AgentsList" component={AgentsScreen} />
+      <Stack.Screen name="CustomAgents" component={CustomAgentsScreen} />
+      <Stack.Screen name="DefaultAgents" component={DefaultAgentsScreen} />
       <Stack.Screen name="CreateAgent" component={CreateAgentScreen} />
       <Stack.Screen name="EditAgent" component={EditAgentScreen} />
     </Stack.Navigator>

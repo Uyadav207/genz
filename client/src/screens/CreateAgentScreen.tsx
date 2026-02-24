@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Check, Sparkles } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { FontSize, Spacing, DEFAULT_SKILLS, AGENT_EMOJI_OPTIONS, EMOJI_ICON_PREFIX } from '@/constants';
+import { FontSize, Spacing, BorderRadius, DEFAULT_SKILLS, AGENT_EMOJI_OPTIONS, EMOJI_ICON_PREFIX } from '@/constants';
 import { api } from '@/services/api';
 import { useTheme, useAuth } from '@/contexts';
 import type { AgentsStackParamList } from '@/types';
@@ -81,7 +81,7 @@ export function CreateAgentScreen() {
           name: name.trim(),
           description: description.trim(),
           instruction: instruction.trim(),
-          icon_name: selectedEmoji ? `${EMOJI_ICON_PREFIX}${selectedEmoji}` : 'bot',
+          icon_name: selectedEmoji ? `${EMOJI_ICON_PREFIX}${selectedEmoji}` : 'user',
           skill_ids: Array.from(selectedSkillIds),
         },
         accessToken
@@ -129,17 +129,6 @@ export function CreateAgentScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>Name</Text>
-          <TextInput
-            style={[styles.input, styles.inputSingle, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceSecondary }]}
-            placeholder="e.g. My Research Assistant"
-            placeholderTextColor={colors.textSecondary}
-            value={name}
-            onChangeText={setName}
-          />
-        </View>
-
-        <View style={styles.section}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>Icon</Text>
           <Text style={[styles.hint, { color: colors.textSecondary }]}>
             Pick an emoji for your agent (shown in the agents list and chat).
@@ -163,6 +152,17 @@ export function CreateAgentScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>Name</Text>
+          <TextInput
+            style={[styles.input, styles.inputSingle, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceSecondary }]}
+            placeholder="e.g. My Research Assistant"
+            placeholderTextColor={colors.textSecondary}
+            value={name}
+            onChangeText={setName}
+          />
+        </View>
+
+        <View style={styles.section}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>Description</Text>
           <Text style={[styles.hint, { color: colors.textSecondary }]}>
             How would you describe this agent to others?
@@ -183,14 +183,6 @@ export function CreateAgentScreen() {
           <Text style={[styles.hint, { color: colors.textSecondary }]}>
             Describe how the agent should behave (tone, style, constraints).
           </Text>
-          <TouchableOpacity
-            style={[styles.generatePromptBtn, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}
-            onPress={() => setShowGenerateModal(true)}
-            activeOpacity={0.7}
-          >
-            <Sparkles size={16} color={colors.primary} />
-            <Text style={[styles.generatePromptLabel, { color: colors.primary }]}>Generate world-class prompt with AI</Text>
-          </TouchableOpacity>
           <TextInput
             style={[styles.input, styles.inputMultiline, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceSecondary }]}
             placeholder="e.g. Always cite sources. Prefer concise answers. Never make up facts."
@@ -200,6 +192,14 @@ export function CreateAgentScreen() {
             multiline
             numberOfLines={4}
           />
+          <TouchableOpacity
+            style={[styles.generatePromptBtn, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}
+            onPress={() => setShowGenerateModal(true)}
+            activeOpacity={0.7}
+          >
+            <Sparkles size={16} color={colors.primary} />
+            <Text style={[styles.generatePromptLabel, { color: colors.primary }]}>Help me write this</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -242,7 +242,7 @@ export function CreateAgentScreen() {
               <TouchableOpacity onPress={() => setShowGenerateModal(false)} activeOpacity={0.7}>
                 <Text style={[modalStyles.cancelText, { color: colors.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
-              <Text style={[modalStyles.title, { color: colors.text }]}>Generate world-class prompt</Text>
+              <Text style={[modalStyles.title, { color: colors.text }]}>What should your agent do?</Text>
               <TouchableOpacity
                 onPress={handleGeneratePrompt}
                 activeOpacity={0.7}
@@ -258,7 +258,7 @@ export function CreateAgentScreen() {
             </View>
             <View style={modalStyles.fields}>
               <Text style={[modalStyles.fieldLabel, { color: colors.textSecondary }]}>
-                What should your agent do? Describe tone, tasks, and constraints. We'll use prompt engineering to create instructions optimized for LLMs.
+                Describe the tone, tasks, and limits you have in mind. We'll turn that into clear instructions for your agent.
               </Text>
               <TextInput
                 style={[modalStyles.fieldInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceSecondary }]}
@@ -296,8 +296,8 @@ const styles = StyleSheet.create({
   scrollContent: { padding: Spacing.md, gap: Spacing.lg },
   section: { gap: Spacing.xs },
   label: { fontSize: FontSize.sm, fontWeight: '600' },
-  hint: { fontSize: 12, marginBottom: 4 },
-  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  hint: { fontSize: FontSize.xs },
+  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   emojiOption: {
     width: 44,
     height: 44,
@@ -309,20 +309,21 @@ const styles = StyleSheet.create({
   emojiText: { fontSize: 24 },
   input: {
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.sm + 6,
+    paddingVertical: Spacing.sm,
     fontSize: 15,
   },
-  inputSingle: { paddingVertical: 12 },
-  inputMultiline: { paddingVertical: 12, minHeight: 88, textAlignVertical: 'top' },
-  skillsList: { gap: 6, marginTop: 4 },
+  inputSingle: {},
+  inputMultiline: { minHeight: 88, textAlignVertical: 'top' },
+  skillsList: { gap: Spacing.sm },
   skillRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
-    padding: 12,
-    borderRadius: 12,
+    gap: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
   },
   skillText: { flex: 1, gap: 2 },
@@ -331,12 +332,12 @@ const styles = StyleSheet.create({
   generatePromptBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    marginBottom: 8,
+    marginTop: Spacing.sm,
     alignSelf: 'flex-start',
   },
   generatePromptLabel: { fontSize: 14, fontWeight: '600' },

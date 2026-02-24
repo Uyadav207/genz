@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DrawerContentScrollView, DrawerContentComponentProps } from '@react-navigation/drawer';
-import { MessageCircle, Bot, Settings, MoreVertical } from 'lucide-react-native';
+import { Home, MessageCircle, User, Settings, MoreVertical, Compass } from 'lucide-react-native';
 import { api } from '@/services/api';
 import { DEFAULT_AGENT_ID, Spacing, SIDEBAR_WIDTH } from '@/constants';
 import { useAuth, useChats, useTheme } from '@/contexts';
@@ -23,8 +23,10 @@ import type { MainTabsParamList } from '@/types';
 type NavRoute = keyof MainTabsParamList;
 
 const NAV_ITEMS: { route: NavRoute; label: string; icon: typeof MessageCircle }[] = [
+  { route: 'Home', label: 'Home', icon: Home },
   { route: 'Chat', label: 'New chat', icon: MessageCircle },
-  { route: 'Agents', label: 'Agents', icon: Bot },
+  { route: 'Agents', label: 'Agents', icon: User },
+  { route: 'Marketplace', label: 'Marketplace', icon: Compass as any },
   { route: 'Settings', label: 'Settings', icon: Settings },
 ];
 
@@ -121,7 +123,7 @@ export function SidebarContent(props: DrawerContentComponentProps) {
     >
       {/* Nav bar at top with title — chats sit under this */}
       <View style={[styles.sidebarHeader, { borderBottomColor: colors.border }]}>
-        <Text style={[styles.sidebarTitle, { color: colors.text }]}>GenZ AI</Text>
+        <Text style={[styles.sidebarTitle, { color: colors.text }]}>GenZ</Text>
       </View>
 
       <View style={styles.navSection}>

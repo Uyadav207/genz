@@ -29,20 +29,24 @@ func Setup(router *gin.Engine, cfg *config.Config) {
 		c.JSON(200, gin.H{"message": "pong"})
 	})
 
-	// ── Debug: SERP API test (no auth, for curl testing) ─────
-	v1.GET("/debug/serp", handlers.SerpTest(cfg))
-
 	// ── Voice WebSocket (auth via query param token; cannot use AuthMiddleware on upgrade) ─────
 	v1.GET("/voice/stream", handlers.VoiceStream(cfg))
 
-	// ── Marketplace Public ───────────────────────────
-	v1.GET("/marketplace/listings", handlers.ListMarketplaceListings)
-	v1.GET("/marketplace/listings/:id", handlers.GetMarketplaceListing)
+	// ── Marketplace Public (optional auth so "downloaded" is set when user is logged in) ──
+	marketplacePublic := v1.Group("")
+	marketplacePublic.Use(middleware.OptionalAuthMiddleware(cfg.JWTSecret))
+	{
+		marketplacePublic.GET("/marketplace/listings", handlers.ListMarketplaceListings)
+		marketplacePublic.GET("/marketplace/listings/:id", handlers.GetMarketplaceListing)
+	}
 
 	// ── Protected routes (require valid JWT) ─────────
 	protected := v1.Group("/")
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 	{
+		// Debug: SERP API test (authenticated users only)
+		protected.GET("/debug/serp", handlers.SerpTest(cfg))
+
 		// Auth (authenticated)
 		protected.GET("/auth/me", handlers.GetCurrentUser)
 

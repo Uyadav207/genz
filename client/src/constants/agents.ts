@@ -19,7 +19,7 @@ export const DEFAULT_AGENTS: AgentDef[] = [
   { id: 'image', name: 'Image Generator', description: 'Create images from text', iconName: 'image' },
   { id: 'brain', name: 'Research Analyst', description: 'Deep research & analysis', iconName: 'brain' },
   { id: 'web', name: 'Web Browser', description: 'Search & browse the web', iconName: 'globe' },
-  { id: 'general', name: 'General Assistant', description: 'All-purpose AI helper', iconName: 'bot' },
+  { id: 'general', name: 'General Assistant', description: 'All-purpose AI helper', iconName: 'user' },
 ];
 
 export const AGENT_ICON_COLORS: Record<string, string> = {
@@ -30,6 +30,7 @@ export const AGENT_ICON_COLORS: Record<string, string> = {
   brain: '#F59E0B',
   globe: '#7DD3FC',
   bot: '#CDA4F0',
+  user: '#CDA4F0',
 };
 
 /** Personalized empty-state greeting per default agent (no action cards). Custom agents use agent name + generic line. */
@@ -58,6 +59,6 @@ export const AGENT_EMOJI_OPTIONS = [
 export const DEFAULT_SKILLS = [
   { id: 'web_search', label: 'Web Search', description: 'Search the internet for up-to-date information' },
   { id: 'memory', label: 'Memory', description: 'Remember context across conversations' },
-  { id: 'knowledge_base', label: 'Knowledge Base', description: 'Upload documents to give your agent permanent knowledge (RAG)' },
+  { id: 'knowledge_base', label: 'Knowledge Base', description: 'Upload documents to give your agent permanent knowledge' },
   { id: 'image_generation', label: 'Image Generation', description: 'Generate images from text descriptions using AI' },
 ] as const;

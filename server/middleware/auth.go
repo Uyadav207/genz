@@ -51,3 +51,37 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// OptionalAuthMiddleware parses the JWT from the Authorization header when present.
+// If valid, sets userID (and email/claims) in context; if missing or invalid, continues without aborting.
+// Use on public routes that can personalize response when the user is logged in (e.g. marketplace "downloaded" flag).
+func OptionalAuthMiddleware(jwtSecret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.Next()
+			return
+		}
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		if tokenString == authHeader {
+			c.Next()
+			return
+		}
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, jwt.ErrSignatureInvalid
+			}
+			return []byte(jwtSecret), nil
+		})
+		if err != nil || !token.Valid {
+			c.Next()
+			return
+		}
+		if claims, ok := token.Claims.(jwt.MapClaims); ok {
+			c.Set("userID", claims["sub"])
+			c.Set("email", claims["email"])
+			c.Set("claims", claims)
+		}
+		c.Next()
+	}
+}
