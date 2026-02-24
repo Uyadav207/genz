@@ -33,7 +33,7 @@ func main() {
 	// Apply global middleware
 	router.Use(gin.Recovery())
 	router.Use(middleware.LoggerMiddleware())
-	router.Use(middleware.CORSMiddleware())
+	router.Use(middleware.CORSMiddleware(cfg.Port))
 
 	// Setup routes
 	routes.Setup(router, cfg)

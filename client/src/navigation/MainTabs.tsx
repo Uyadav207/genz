@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { MessageCircle, Bot, Settings, Compass } from 'lucide-react-native';
+import { MessageCircle, User, Settings, Compass } from 'lucide-react-native';
 import { ChatScreen } from '@/screens/ChatScreen';
 import { AgentsScreen } from '@/screens/AgentsScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
@@ -52,7 +52,7 @@ export function MainTabs() {
         component={AgentsScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Bot size={size} color={color} />
+            <User size={size} color={color} />
           ),
         }}
       />

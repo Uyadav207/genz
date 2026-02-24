@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"slices"
 	"strings"
@@ -103,19 +102,14 @@ func VoiceStream(cfg *config.Config) gin.HandlerFunc {
 				systemInstruction += "\n\nSKILL GUARDRAILS (follow these when deciding to use tools):\n" + modifiers
 			}
 			systemInstruction += "\n\nYou have access to tools. Use web_search when the user asks for current information, facts, news, or anything requiring up-to-date data. After receiving tool results, synthesize the information into a natural spoken answer."
-			log.Printf("[VOICE] Agent %q has %d tool(s) registered for voice session", agentID, len(tools))
 		}
 
 		// Knowledge Base injection for voice: pre-load all KB content into system prompt
 		if slices.Contains(skillIDs, "knowledge_base") && agentID != "" {
-			kbContext, kbErr := knowledge.PreloadContext(agentID)
-			if kbErr != nil {
-				log.Printf("[VOICE] KB preload error (non-fatal): %v", kbErr)
-			}
+			kbContext, _ := knowledge.PreloadContext(agentID)
 			if kbContext != "" {
 				systemInstruction += "\n\nKNOWLEDGE BASE CONTEXT (from user's uploaded documents — use this to answer questions):\n" + kbContext
 				systemInstruction += "\nWhen answering questions about topics covered in the knowledge base above, prioritize that information. Cite the source when relevant. Keep voice answers concise but accurate."
-				log.Printf("[VOICE] Injected KB context: %d chars for agent %s", len(kbContext), agentID)
 			}
 		}
 
@@ -132,7 +126,6 @@ func VoiceStream(cfg *config.Config) gin.HandlerFunc {
 
 		conn, err := voiceUpgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
-			log.Printf("[VOICE] upgrade error: %v", err)
 			return
 		}
 		defer conn.Close()
@@ -141,7 +134,6 @@ func VoiceStream(cfg *config.Config) gin.HandlerFunc {
 		connectOpts := voice.ConnectOptions{Tools: tools}
 		liveClient, err := voice.Connect(cfg.GeminiAPIKey, systemInstruction, cfg.GeminiVoiceModel, cfg.GeminiLiveAPIVersion, connectOpts)
 		if err != nil {
-			log.Printf("[VOICE] Live connect error: %v", err)
 			_ = conn.WriteJSON(gin.H{"type": "error", "message": "Failed to connect to voice service"})
 			return
 		}
@@ -153,8 +145,6 @@ func VoiceStream(cfg *config.Config) gin.HandlerFunc {
 		// Set up tool call handler — executes tools server-side and sends results back to Gemini
 		if len(tools) > 0 {
 			liveClient.SetOnToolCall(func(tc *voice.ToolCall) {
-				log.Printf("[VOICE] Processing %d tool call(s)", len(tc.FunctionCalls))
-
 				// Notify client that we're searching
 				writeMu.Lock()
 				_ = conn.WriteJSON(gin.H{"type": "tool_call", "status": "searching"})
@@ -171,10 +161,8 @@ func VoiceStream(cfg *config.Config) gin.HandlerFunc {
 						} else if webSearchSvc == nil || cfg.SERPAPIKey == "" {
 							result = map[string]interface{}{"error": "Web search is not configured"}
 						} else {
-							log.Printf("[VOICE] Executing web_search for query=%q", query)
 							searchResult, err := webSearchSvc.RunWithSystemPrompt(context.Background(), query, systemInstruction)
 							if err != nil {
-								log.Printf("[VOICE] web_search error: %v", err)
 								result = map[string]interface{}{"error": err.Error()}
 							} else {
 								result = map[string]interface{}{"answer": searchResult.Answer}
@@ -187,11 +175,9 @@ func VoiceStream(cfg *config.Config) gin.HandlerFunc {
 								if len(searchResult.Images) > 0 {
 									result["images"] = searchResult.Images
 								}
-								log.Printf("[VOICE] web_search OK: answer_len=%d sources=%d", len(searchResult.Answer), len(searchResult.Sources))
 							}
 						}
 					default:
-						log.Printf("[VOICE] Unknown tool: %q", fc.Name)
 						result = map[string]interface{}{"error": "unknown tool: " + fc.Name}
 					}
 					responses = append(responses, voice.FunctionResponseInfo{
@@ -202,9 +188,7 @@ func VoiceStream(cfg *config.Config) gin.HandlerFunc {
 				}
 
 				// Send tool responses back to Gemini Live
-				if err := liveClient.SendToolResponse(responses); err != nil {
-					log.Printf("[VOICE] Failed to send toolResponse: %v", err)
-				}
+				_ = liveClient.SendToolResponse(responses)
 
 				// Notify client that search is done
 				writeMu.Lock()
@@ -225,7 +209,6 @@ func VoiceStream(cfg *config.Config) gin.HandlerFunc {
 				writeMu.Lock()
 				_ = conn.WriteJSON(gin.H{"type": "transcript", "role": "user", "text": userText})
 				writeMu.Unlock()
-				log.Printf("[VOICE] transcript user: %q", userText)
 			}
 			assistText := ""
 			if sc.OutputTranscription != nil && sc.OutputTranscription.Text != "" {
@@ -238,7 +221,6 @@ func VoiceStream(cfg *config.Config) gin.HandlerFunc {
 				writeMu.Lock()
 				_ = conn.WriteJSON(gin.H{"type": "transcript", "role": "assistant", "text": assistText})
 				writeMu.Unlock()
-				log.Printf("[VOICE] transcript assistant: %q", assistText)
 			}
 			// Send all audio chunks before turnComplete so the client receives everything before playing
 			for _, audioData := range sc.GetAllAudioData() {
@@ -275,22 +257,15 @@ func VoiceStream(cfg *config.Config) gin.HandlerFunc {
 			case "audio":
 				pcmBase64, err := voice.StripWAVHeader(msg.Data)
 				if err != nil {
-					log.Printf("[VOICE] strip WAV header: %v", err)
 					continue
 				}
-				if err := liveClient.SendPCM(pcmBase64); err != nil {
-					log.Printf("[VOICE] send PCM: %v", err)
-				}
+				_ = liveClient.SendPCM(pcmBase64)
 			case "text":
 				if msg.Data != "" {
-					if err := liveClient.SendText(msg.Data); err != nil {
-						log.Printf("[VOICE] send text: %v", err)
-					}
+					_ = liveClient.SendText(msg.Data)
 				}
 			case "endOfTurn":
-				if err := liveClient.SendTurnComplete(); err != nil {
-					log.Printf("[VOICE] send turn complete: %v", err)
-				}
+				_ = liveClient.SendTurnComplete()
 			case "end":
 				goto done
 			}
@@ -318,15 +293,12 @@ func VoiceStream(cfg *config.Config) gin.HandlerFunc {
 				continue
 			}
 			row := map[string]interface{}{"chat_id": chatID, "role": m.Role, "content": m.Content}
-			if err := database.GetAdminClient().DB.From("messages").Insert(row).Execute(&[]models.Message{}); err != nil {
-				log.Printf("[VOICE] failed to insert message: %v", err)
-			}
+			_ = database.GetAdminClient().DB.From("messages").Insert(row).Execute(&[]models.Message{})
 		}
 
 		writeMu.Lock()
 		_ = conn.WriteJSON(gin.H{"type": "saved", "chat_id": chatID, "title": title})
 		writeMu.Unlock()
-		log.Printf("[VOICE] saved chat_id=%s messages=%d", chatID, len(sess.GetMessages()))
 	}
 }
 

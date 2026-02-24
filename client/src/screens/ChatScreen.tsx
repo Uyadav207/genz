@@ -25,7 +25,6 @@ import {
   ArrowUp,
   Menu,
   X,
-  Bot,
   Code,
   PenLine,
   ImageIcon,
@@ -39,7 +38,6 @@ import {
   Copy,
   BookOpen,
   Mic,
-
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
@@ -150,7 +148,9 @@ function AgentIcon({ name, size = 22, color: colorOverride }: { name: string; si
     case 'image': return <ImageIcon size={size} color={color} />;
     case 'brain': return <BrainCircuit size={size} color={color} />;
     case 'globe': return <Globe size={size} color={color} />;
-    default: return <Bot size={size} color={color} />;
+    case 'bot':
+    case 'user':
+    default: return <User size={size} color={color} />;
   }
 }
 
@@ -433,7 +433,7 @@ function ChatMessageRow({ item, isStreaming, colors, isDark, mdStyles, markdownR
           </View>
         ) : (
           <View style={[msgStyles.avatar, { backgroundColor: assistantAvatarBg }]}>
-            <AgentIconOrEmoji iconName={agentIconName ?? 'bot'} size={15} color={colors.white} />
+            <AgentIconOrEmoji iconName={agentIconName ?? 'user'} size={15} color={colors.white} />
           </View>
         )}
         {!isUser && <View style={[msgStyles.onlineDot, { borderColor: colors.background }]} />}
@@ -582,7 +582,7 @@ export function ChatScreen() {
       id: effectiveAgentId,
       name: routeParams?.agentName ?? 'Agent',
       description: '',
-      iconName: (routeParams?.agentIconName as string) || 'bot',
+      iconName: (routeParams?.agentIconName as string) || 'user',
     };
   }, [effectiveAgentId, routeParams?.agentName, routeParams?.agentIconName]);
   const showActionCards = AGENTS_WITH_ACTION_CARDS.includes(effectiveAgentId);
@@ -1009,8 +1009,9 @@ export function ChatScreen() {
           <View style={[
             styles.inputBar,
             {
-              backgroundColor: colors.inputBackground,
-              borderColor: colors.border,
+              backgroundColor: isDark ? colors.inputBackground : '#FFFFFF',
+              borderColor: isDark ? '#353240' : '#E0DCE8',
+              borderWidth: 1,
               shadowColor: '#000',
               shadowOpacity: isDark ? 0.2 : 0.04,
               shadowOffset: { width: 0, height: 1 },

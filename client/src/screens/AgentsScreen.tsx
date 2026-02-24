@@ -1,29 +1,19 @@
 /**
- * Agents screen — create agent option + list of available agents (built-in + custom).
+ * Agents screen — hub with create agent option + buttons to Custom / Default agents.
  */
 
-import React, { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  SectionList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  type SectionListRenderItemInfo,
-} from 'react-native';
+import React from 'react';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Menu, Plus, Bot, Code, PenLine, ImageIcon, BrainCircuit, Globe, Sparkles, MoreVertical } from 'lucide-react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { Bot, BrainCircuit, Code, Globe, Image as ImageIcon, Menu, MoreVertical, PenLine, Plus, Sparkles, User } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ScreenWrapper } from '@/components/common';
+import { DEFAULT_AGENTS, AGENT_ICON_COLORS, type AgentDef } from '@/constants/agents';
+import { Spacing } from '@/constants';
+import { useAuth, useTheme } from '@/contexts';
 import { api } from '@/services/api';
-import { Spacing, DEFAULT_AGENTS, AGENT_ICON_COLORS } from '@/constants';
-import type { AgentDef } from '@/constants';
-import { useTheme, useAuth } from '@/contexts';
-import type { AgentsStackParamList } from '@/types';
-import type { MainTabsParamList } from '@/types';
+import type { AgentsStackParamList, MainTabsParamList } from '@/types';
 
 type StackNav = NativeStackNavigationProp<AgentsStackParamList, 'AgentsList'>;
 
@@ -70,7 +60,7 @@ function AgentRow({
 }) {
   return (
     <TouchableOpacity
-      style={[styles.agentRow, { backgroundColor: '#FFFFFF', borderColor: colors.border }]}
+      style={[styles.agentRow, { backgroundColor: colors.card, borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -108,110 +98,10 @@ function AgentRow({
 
 export function AgentsScreen() {
   const { colors } = useTheme();
-  const { accessToken } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNav>();
-  const [customAgents, setCustomAgents] = useState<AgentItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadAgents = useCallback(async () => {
-    if (!accessToken) {
-      setCustomAgents([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const { agents } = await api.listAgents(accessToken);
-      setCustomAgents(
-        (agents ?? []).map((a) => ({
-          id: a.id,
-          name: a.name,
-          description: a.description || '',
-          iconName: a.icon_name || 'bot',
-          skillIds: a.skill_ids || [],
-        }))
-      );
-    } catch {
-      setCustomAgents([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [accessToken]);
-
-  // Load agents on mount and when returning from CreateAgent
-  useFocusEffect(
-    useCallback(() => {
-      loadAgents();
-    }, [loadAgents])
-  );
 
   const openDrawer = () => (navigation.getParent() as { openDrawer?: () => void })?.openDrawer?.();
-
-  const handleAgentPress = (item: AgentItem) => {
-    const tabNav = navigation.getParent() as { navigate: (name: keyof MainTabsParamList, params?: object) => void } | undefined;
-    // Always open a new chat when selecting an agent (no chatId)
-    const skillIds = 'skillIds' in item ? (item as { skillIds?: string[] }).skillIds : undefined;
-    tabNav?.navigate('Chat', { chatId: undefined, agentId: item.id, agentName: item.name, agentIconName: item.iconName, agentSkillIds: skillIds });
-  };
-
-  const sections: { title: string; data: AgentItem[] }[] = [
-    { title: 'Custom agents', data: customAgents },
-    { title: 'Default agents', data: DEFAULT_AGENTS },
-  ];
-
-  const renderSectionHeader = ({ section }: any) => (
-    <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{section.title}</Text>
-  );
-
-  const handleEditAgent = (agentId: string) => {
-    navigation.navigate('EditAgent', { agentId });
-  };
-
-  const handlePublishAgent = (agentId: string) => {
-    const tabNav = navigation.getParent() as any;
-    tabNav?.navigate('Marketplace', { screen: 'PublishListing', params: { agentId } });
-  };
-
-  const handleDeleteAgent = (item: AgentItem) => {
-    Alert.alert(
-      'Delete agent',
-      `Are you sure you want to delete "${item.name}"? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            if (!accessToken) return;
-            try {
-              await api.deleteAgent(item.id, accessToken);
-              loadAgents();
-            } catch {
-              Alert.alert('Error', 'Failed to delete agent. Please try again.');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const renderAgent = (info: any) => {
-    const { item, section } = info;
-    return (
-      <AgentRow
-        item={item}
-        colors={colors}
-        onPress={() => handleAgentPress(item)}
-        isCustom={section.title === 'Custom agents'}
-        onEdit={section.title === 'Custom agents' ? () => handleEditAgent(item.id) : undefined}
-        onPublish={section.title === 'Custom agents' ? () => handlePublishAgent(item.id) : undefined}
-        onDelete={section.title === 'Custom agents' ? () => handleDeleteAgent(item) : undefined}
-      />
-    );
-  };
-
-  const renderListFooter = () => <View style={{ height: insets.bottom + Spacing.lg }} />;
 
   return (
     <ScreenWrapper style={styles.wrapper} padded={false}>
@@ -224,12 +114,12 @@ export function AgentsScreen() {
 
       <View style={styles.content}>
         <TouchableOpacity
-          style={[styles.createCard, { backgroundColor: '#FFFFFF', borderColor: colors.border }]}
+          style={[styles.createCard, { backgroundColor: colors.card, borderColor: colors.border }]}
           onPress={() => navigation.navigate('CreateAgent')}
           activeOpacity={0.7}
         >
           <View style={[styles.createIconWrap, { backgroundColor: colors.primary }]}>
-            <Plus size={22} color="#FFF" strokeWidth={2.5} />
+            <Plus size={22} color={colors.white} strokeWidth={2.5} />
           </View>
           <View style={styles.createTextWrap}>
             <Text style={[styles.createLabel, { color: colors.text }]}>Create agent</Text>
@@ -239,27 +129,37 @@ export function AgentsScreen() {
           </View>
         </TouchableOpacity>
 
-        {loading ? (
-          <ActivityIndicator size="small" color={colors.textSecondary} style={{ padding: Spacing.lg }} />
-        ) : (
-          <SectionList
-            sections={sections}
-            keyExtractor={(a) => a.id}
-            renderItem={renderAgent}
-            renderSectionHeader={renderSectionHeader}
-            stickySectionHeadersEnabled={false}
-            contentContainerStyle={styles.listContent}
-            ListFooterComponent={renderListFooter}
-            showsVerticalScrollIndicator={false}
-            renderSectionFooter={({ section }) =>
-              section.data.length === 0 && section.title === 'Custom agents' ? (
-                <Text style={[styles.emptySection, { color: colors.textSecondary }]}>
-                  No custom agents yet. Create one above.
-                </Text>
-              ) : null
-            }
-          />
-        )}
+        <TouchableOpacity
+          style={[styles.optionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => navigation.navigate('CustomAgents')}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.optionIconWrap, { backgroundColor: colors.surface }]}>
+            <User size={24} color={colors.primary} />
+          </View>
+          <View style={styles.optionTextWrap}>
+            <Text style={[styles.optionLabel, { color: colors.text }]}>Custom agents</Text>
+            <Text style={[styles.optionHint, { color: colors.textSecondary }]}>
+              Your created agents — edit, publish, or delete
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.optionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => navigation.navigate('DefaultAgents')}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.optionIconWrap, { backgroundColor: colors.surface }]}>
+            <Sparkles size={24} color={colors.primary} />
+          </View>
+          <View style={styles.optionTextWrap}>
+            <Text style={[styles.optionLabel, { color: colors.text }]}>Default agents</Text>
+            <Text style={[styles.optionHint, { color: colors.textSecondary }]}>
+              Built-in agents — GenZ, Coder, Writer, and more
+            </Text>
+          </View>
+        </TouchableOpacity>
       </View>
     </ScreenWrapper>
   );
@@ -284,6 +184,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderRadius: 12,
     borderWidth: 1,
+    borderStyle: 'dashed',
     marginBottom: Spacing.lg,
   },
   createIconWrap: {
@@ -296,27 +197,23 @@ const styles = StyleSheet.create({
   createTextWrap: { flex: 1 },
   createLabel: { fontSize: 16, fontWeight: '600' },
   createHint: { fontSize: 12, marginTop: 2 },
-  sectionTitle: { fontSize: 13, fontWeight: '600', marginTop: Spacing.md, marginBottom: Spacing.sm },
-  listContent: { gap: 8, paddingBottom: Spacing.md },
-  emptySection: { fontSize: 13, fontStyle: 'italic', marginBottom: Spacing.sm },
-  agentRow: {
+  optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
     padding: Spacing.md,
     borderRadius: 12,
     borderWidth: 1,
+    marginBottom: Spacing.md,
   },
-  agentRowContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  moreBtn: { padding: 4 },
-  agentIconWrap: {
+  optionIconWrap: {
     width: 44,
     height: 44,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  agentText: { flex: 1 },
-  agentName: { fontSize: 15, fontWeight: '600' },
-  agentDesc: { fontSize: 13, marginTop: 2 },
+  optionTextWrap: { flex: 1 },
+  optionLabel: { fontSize: 16, fontWeight: '600' },
+  optionHint: { fontSize: 12, marginTop: 2 },
 });

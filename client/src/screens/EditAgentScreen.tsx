@@ -21,7 +21,7 @@ import { ArrowLeft, Check, Sparkles, Plus, Trash2, FileText } from 'lucide-react
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
-import { FontSize, Spacing, DEFAULT_SKILLS, AGENT_EMOJI_OPTIONS, EMOJI_ICON_PREFIX } from '@/constants';
+import { FontSize, Spacing, BorderRadius, DEFAULT_SKILLS, AGENT_EMOJI_OPTIONS, EMOJI_ICON_PREFIX } from '@/constants';
 import { api, type KnowledgeDoc } from '@/services/api';
 import * as DocumentPicker from 'expo-document-picker';
 import { useTheme, useAuth } from '@/contexts';
@@ -176,7 +176,7 @@ export function EditAgentScreen() {
           name: name.trim(),
           description: description.trim(),
           instruction: instruction.trim(),
-          icon_name: selectedEmoji ? `${EMOJI_ICON_PREFIX}${selectedEmoji}` : 'bot',
+          icon_name: selectedEmoji ? `${EMOJI_ICON_PREFIX}${selectedEmoji}` : 'user',
           skill_ids: Array.from(selectedSkillIds),
         },
         accessToken
@@ -356,7 +356,7 @@ export function EditAgentScreen() {
                     style={[styles.skillRow, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
                   >
                     <FileText size={18} color={colors.primary} />
-                    <View style={[styles.skillText, { marginLeft: 4 }]}>
+                    <View style={[styles.skillText, { marginLeft: Spacing.xs }]}>
                       <Text style={[styles.skillLabel, { color: colors.text }]} numberOfLines={1}>
                         {doc.file_name}
                       </Text>
@@ -389,7 +389,7 @@ export function EditAgentScreen() {
               <TouchableOpacity onPress={() => setShowGenerateModal(false)} activeOpacity={0.7}>
                 <Text style={[modalStyles.cancelText, { color: colors.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
-              <Text style={[modalStyles.title, { color: colors.text }]}>Generate world-class prompt</Text>
+              <Text style={[modalStyles.title, { color: colors.text }]}>What should your agent do?</Text>
               <TouchableOpacity
                 onPress={handleGeneratePrompt}
                 activeOpacity={0.7}
@@ -405,7 +405,7 @@ export function EditAgentScreen() {
             </View>
             <View style={modalStyles.fields}>
               <Text style={[modalStyles.fieldLabel, { color: colors.textSecondary }]}>
-                What should your agent do? Describe tone, tasks, and constraints. We'll use prompt engineering to create instructions optimized for LLMs.
+                Describe the tone, tasks, and limits you have in mind. We'll turn that into clear instructions for your agent.
               </Text>
               <TextInput
                 style={[modalStyles.fieldInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceSecondary }]}
@@ -478,8 +478,8 @@ const styles = StyleSheet.create({
   scrollContent: { padding: Spacing.md, gap: Spacing.lg },
   section: { gap: Spacing.xs },
   label: { fontSize: FontSize.sm, fontWeight: '600' },
-  hint: { fontSize: 12, marginBottom: 4 },
-  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  hint: { fontSize: FontSize.xs },
+  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   emojiOption: {
     width: 44,
     height: 44,
@@ -491,34 +491,35 @@ const styles = StyleSheet.create({
   emojiText: { fontSize: 24 },
   input: {
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.sm + 6,
+    paddingVertical: Spacing.sm,
     fontSize: 15,
   },
-  inputSingle: { paddingVertical: 12 },
-  inputMultiline: { paddingVertical: 12, minHeight: 88, textAlignVertical: 'top' },
-  skillsList: { gap: 6, marginTop: 4 },
+  inputSingle: {},
+  inputMultiline: { minHeight: 88, textAlignVertical: 'top' },
+  skillsList: { gap: Spacing.sm },
   skillRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
-    padding: 12,
-    borderRadius: 12,
+    gap: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
   },
   skillText: { flex: 1, gap: 2 },
   skillLabel: { fontSize: 15, fontWeight: '600' },
-  skillDesc: { fontSize: 12 },
+  skillDesc: { fontSize: FontSize.xs },
   generatePromptBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    marginBottom: 8,
+    marginTop: Spacing.sm,
     alignSelf: 'flex-start',
   },
   generatePromptLabel: { fontSize: 14, fontWeight: '600' },
